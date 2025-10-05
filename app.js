@@ -1,48 +1,46 @@
 document.addEventListener('DOMContentLoaded', function () {
     const tg = window.Telegram.WebApp;
 
-    // --- DOM Elements ---
     const messageTextarea = document.getElementById('message');
     const imageUrlInput = document.getElementById('image-url');
     const chatListContainer = document.getElementById('chat-list-container');
     const loadingChatsP = document.getElementById('loading-chats');
 
-    // --- Initialize the Web App ---
     tg.ready();
     tg.expand();
     tg.MainButton.text = "Save Configuration";
 
-    // --- Tell the bot we are ready for data ---
-    // The bot will receive this and reply with the combined config
-    tg.sendData(JSON.stringify({ type: "get_data" }));
-    
-    // --- Listen for the bot's data response ---
-    tg.onEvent('web_app_data_recieved', function(event) {
-        try {
-            const data = JSON.parse(event.data);
-            populateForm(data);
-        } catch (e) {
-            loadingChatsP.innerText = 'Error loading initial data.';
-            console.error(e);
+    // --- NEW LOGIC: Read initial data from the URL hash ---
+    function loadInitialData() {
+        // The hash contains the URL-encoded JSON data from the bot
+        const hash = window.location.hash.substring(1);
+        if (hash) {
+            try {
+                const decodedData = decodeURIComponent(hash);
+                const initialData = JSON.parse(decodedData);
+                populateForm(initialData);
+            } catch (e) {
+                loadingChatsP.innerText = 'Error parsing initial data from URL.';
+                console.error(e);
+            }
+        } else {
+            loadingChatsP.innerText = 'No initial data found. Please try launching from Telegram again.';
         }
-    });
+    }
 
     function populateForm(data) {
         loadingChatsP.style.display = 'none';
         tg.MainButton.show();
 
-        // Populate the message and image URL from saved config
         messageTextarea.value = data.config.message || '';
         imageUrlInput.value = data.config.image_url || '';
 
-        // Populate the chat list
         if (!data.chats || data.chats.length === 0) {
-            chatListContainer.innerHTML = '<p>Could not find any groups or channels.</p>';
+            chatListContainer.innerHTML = '<p>Could not find any groups or channels in your account.</p>';
             return;
         }
 
         data.chats.forEach(chat => {
-            // Check if this chat was previously saved in the user's config
             const savedGroup = data.config.groups ? data.config.groups[chat.id] : null;
             const isChecked = savedGroup ? 'checked' : '';
             const intervalValue = savedGroup ? savedGroup.interval_hours : '';
@@ -62,7 +60,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // --- Send final configuration back to the Bot ---
+    // --- MainButton click handler (for saving) remains the same ---
     tg.MainButton.onClick(() => {
         const message = messageTextarea.value;
         const imageUrl = imageUrlInput.value.trim();
@@ -79,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         const dataToSend = {
-            type: "save",
+            type: "save", // Important: We still tell the bot this is a 'save' operation
             message: message,
             image_url: imageUrl,
             groups: groups
@@ -87,4 +85,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         tg.sendData(JSON.stringify(dataToSend));
     });
+
+    // --- INITIATE THE PROCESS ---
+    loadInitialData();
 });
