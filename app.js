@@ -10,24 +10,33 @@ document.addEventListener('DOMContentLoaded', function () {
     tg.expand();
     tg.MainButton.text = "Save Configuration";
 
+    // --- CRITICAL FIX: A robust Base64 decoder for UTF-8 strings ---
+    // This correctly handles Unicode characters (like Cyrillic, emojis, etc.)
+    // that the standard atob() function corrupts.
+    function b64DecodeUnicode(str) {
+        return decodeURIComponent(atob(str).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+    }
+
     setTimeout(loadInitialData, 100);
 
     function loadInitialData() {
         const rawHash = window.location.hash.substring(1);
         if (rawHash) {
             try {
-                // --- CRITICAL FIX: Decode the URL encoding FIRST ---
                 const base64String = decodeURIComponent(rawHash);
                 
-                // Then, decode the Base64 string
-                const decodedJsonString = atob(base64String);
+                // --- Use the new, robust decoder ---
+                const decodedJsonString = b64DecodeUnicode(base64String);
                 
-                // Finally, parse the JSON
                 const initialData = JSON.parse(decodedJsonString);
                 populateForm(initialData);
             } catch (e) {
-                loadingChatsP.innerText = 'Error: Could not parse initial data from URL.';
+                loadingChatsP.innerText = 'Fatal Error: Could not parse initial data from URL.';
                 console.error('URL/Base64/JSON parsing failed:', e);
+                // For debugging, show the corrupted hash
+                console.error('Received hash:', rawHash);
             }
         } else {
             loadingChatsP.innerText = 'Error: No initial data found in URL. Please try launching from Telegram again.';
@@ -35,19 +44,22 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function populateForm(data) {
-        // ... (This function is unchanged from the previous version) ...
         loadingChatsP.style.display = 'none';
         tg.MainButton.show();
+
         messageTextarea.value = data.config.message || '';
         imageUrlInput.value = data.config.image_url || '';
+
         if (!data.chats || data.chats.length === 0) {
             chatListContainer.innerHTML = '<p>Could not find any groups or channels in your account.</p>';
             return;
         }
+
         data.chats.forEach(chat => {
             const savedGroup = data.config.groups ? data.config.groups[String(chat.id)] : null;
             const isChecked = savedGroup ? 'checked' : '';
             const intervalValue = savedGroup ? savedGroup.interval_hours : '';
+
             const div = document.createElement('div');
             div.className = 'chat-item';
             div.innerHTML = `
@@ -64,19 +76,27 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     tg.MainButton.onClick(() => {
-        // ... (This function is unchanged from the previous version) ...
         const message = messageTextarea.value;
         const imageUrl = imageUrlInput.value.trim();
         const groups = {};
+
         document.querySelectorAll('.chat-selector input[type="checkbox"]:checked').forEach(checkbox => {
             const id = checkbox.value;
             const intervalInput = document.querySelector(`.group-interval[data-id="${id}"]`);
             const interval = parseFloat(intervalInput.value);
+
             if (id && !isNaN(interval) && interval > 0) {
                 groups[id] = { interval_hours: interval };
             }
         });
-        const dataToSend = { type: "save", message: message, image_url: imageUrl, groups: groups };
+
+        const dataToSend = {
+            type: "save",
+            message: message,
+            image_url: imageUrl,
+            groups: groups
+        };
+
         tg.sendData(JSON.stringify(dataToSend));
     });
 });
