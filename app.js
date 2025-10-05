@@ -10,9 +10,12 @@ document.addEventListener('DOMContentLoaded', function () {
     tg.expand();
     tg.MainButton.text = "Save Configuration";
 
-    // --- NEW LOGIC: Read initial data from the URL hash ---
+    // --- CRITICAL FIX: ---
+    // Use a short timeout to ensure the window.location.hash has been
+    // populated by the browser before we try to read it. This solves the race condition.
+    setTimeout(loadInitialData, 100); // 100 millisecond delay is plenty.
+
     function loadInitialData() {
-        // The hash contains the URL-encoded JSON data from the bot
         const hash = window.location.hash.substring(1);
         if (hash) {
             try {
@@ -20,11 +23,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 const initialData = JSON.parse(decodedData);
                 populateForm(initialData);
             } catch (e) {
-                loadingChatsP.innerText = 'Error parsing initial data from URL.';
+                loadingChatsP.innerText = 'Error: Could not parse initial data from URL.';
                 console.error(e);
             }
         } else {
-            loadingChatsP.innerText = 'No initial data found. Please try launching from Telegram again.';
+            loadingChatsP.innerText = 'Error: No initial data found in URL. Please try launching from Telegram again.';
         }
     }
 
@@ -41,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         data.chats.forEach(chat => {
-            const savedGroup = data.config.groups ? data.config.groups[chat.id] : null;
+            const savedGroup = data.config.groups ? data.config.groups[String(chat.id)] : null;
             const isChecked = savedGroup ? 'checked' : '';
             const intervalValue = savedGroup ? savedGroup.interval_hours : '';
 
@@ -60,7 +63,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // --- MainButton click handler (for saving) remains the same ---
     tg.MainButton.onClick(() => {
         const message = messageTextarea.value;
         const imageUrl = imageUrlInput.value.trim();
@@ -77,7 +79,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         const dataToSend = {
-            type: "save", // Important: We still tell the bot this is a 'save' operation
+            type: "save",
             message: message,
             image_url: imageUrl,
             groups: groups
@@ -85,7 +87,4 @@ document.addEventListener('DOMContentLoaded', function () {
 
         tg.sendData(JSON.stringify(dataToSend));
     });
-
-    // --- INITIATE THE PROCESS ---
-    loadInitialData();
 });
