@@ -66,4 +66,22 @@ textarea, input {
     color: white;
     padding: 5px 10px;
     font-size: 12px;
+
+}
+.chat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    border-bottom: 1px solid var(--tg-theme-secondary-bg-color);
+}
+
+.chat-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.interval-input input {
+    width: 80px; /* Make interval input smaller */
 }
