@@ -10,9 +10,6 @@ document.addEventListener('DOMContentLoaded', function () {
     tg.expand();
     tg.MainButton.text = "Save Configuration";
 
-    // --- CRITICAL FIX: A robust Base64 decoder for UTF-8 strings ---
-    // This correctly handles Unicode characters (like Cyrillic, emojis, etc.)
-    // that the standard atob() function corrupts.
     function b64DecodeUnicode(str) {
         return decodeURIComponent(atob(str).split('').map(function(c) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
@@ -25,18 +22,21 @@ document.addEventListener('DOMContentLoaded', function () {
         const rawHash = window.location.hash.substring(1);
         if (rawHash) {
             try {
+                // The raw hash is now fully URL-encoded, so we must decode it.
                 const base64String = decodeURIComponent(rawHash);
-                
-                // --- Use the new, robust decoder ---
                 const decodedJsonString = b64DecodeUnicode(base64String);
-                
                 const initialData = JSON.parse(decodedJsonString);
                 populateForm(initialData);
             } catch (e) {
-                loadingChatsP.innerText = 'Fatal Error: Could not parse initial data from URL.';
+                // --- ROBUST DEBUGGING ---
+                loadingChatsP.innerHTML = `
+                    <p><strong>Fatal Error:</strong> Could not parse initial data from URL.</p>
+                    <p>This is likely a data encoding issue.</p>
+                    <p><strong>Error Details:</strong> ${e.message}</p>
+                    <textarea readonly>${rawHash}</textarea>
+                `;
                 console.error('URL/Base64/JSON parsing failed:', e);
-                // For debugging, show the corrupted hash
-                console.error('Received hash:', rawHash);
+                console.error('Received raw hash:', rawHash);
             }
         } else {
             loadingChatsP.innerText = 'Error: No initial data found in URL. Please try launching from Telegram again.';
@@ -100,3 +100,4 @@ document.addEventListener('DOMContentLoaded', function () {
         tg.sendData(JSON.stringify(dataToSend));
     });
 });
+
