@@ -2,18 +2,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const tg = window.Telegram.WebApp;
 
     const messageTextarea = document.getElementById('message');
+    const imageUrlInput = document.getElementById('image-url'); // NEW: Get the image input
     const groupsContainer = document.getElementById('groups-container');
     const addGroupBtn = document.getElementById('add-group-btn');
 
-    // Initialize the Web App
     tg.ready();
     tg.expand();
-
-    // Configure the Main Button to save and send data
     tg.MainButton.text = "Save Configuration";
     tg.MainButton.show();
 
-    // Function to add a new group input row
     const addGroupRow = (id = '', interval = '') => {
         const groupDiv = document.createElement('div');
         groupDiv.className = 'group-entry';
@@ -23,14 +20,11 @@ document.addEventListener('DOMContentLoaded', function () {
             <button class="remove-btn">X</button>
         `;
         groupsContainer.appendChild(groupDiv);
-
-        // Add event listener to the new remove button
         groupDiv.querySelector('.remove-btn').addEventListener('click', () => {
             groupDiv.remove();
         });
     };
-
-    // Add a group when the button is clicked
+    
     addGroupBtn.addEventListener('click', () => {
         addGroupRow();
     });
@@ -38,6 +32,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Main Logic: Send data back to the bot ---
     tg.MainButton.onClick(() => {
         const message = messageTextarea.value;
+        const imageUrl = imageUrlInput.value.trim(); // NEW: Get the image URL
         const groups = {};
 
         document.querySelectorAll('.group-entry').forEach(entry => {
@@ -52,16 +47,13 @@ document.addEventListener('DOMContentLoaded', function () {
         // Construct the final data object
         const dataToSend = {
             message: message,
+            image_url: imageUrl, // NEW: Add image_url to the data
             groups: groups
         };
 
         // Use the Telegram Web App API to send data to the bot
         tg.sendData(JSON.stringify(dataToSend));
-
-        // Optionally, close the web app after sending
-        // tg.close();
     });
 
-    // For simplicity, we start with one empty group row
     addGroupRow();
 });
