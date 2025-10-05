@@ -10,21 +10,41 @@ document.addEventListener('DOMContentLoaded', function () {
     tg.expand();
     tg.MainButton.text = "Save Configuration";
 
-    function b64DecodeUnicode(str) {
-        return decodeURIComponent(atob(str).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
+    // --- CRITICAL FIX: A robust URL-safe Base64 decoder ---
+    function urlBase64Decode(str) {
+        // Step 1: Replace URL-safe characters with standard Base64 characters
+        let output = str.replace(/-/g, '+').replace(/_/g, '/');
+
+        // Step 2: Add padding if it's missing
+        switch (output.length % 4) {
+            case 0:
+                break;
+            case 2:
+                output += '==';
+                break;
+            case 3:
+                output += '=';
+                break;
+            default:
+                throw 'Illegal base64url string!';
+        }
+
+        // Step 3: Decode the standard Base64 string and then the UTF-8
+        try {
+            return decodeURIComponent(atob(output).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+        } catch (e) {
+            console.error("Base64 decoding failed:", e);
+            throw e;
+        }
     }
 
-    // Use a short timeout to ensure the window.location.hash is ready
     setTimeout(loadInitialData, 100);
 
     function loadInitialData() {
         let rawHash = window.location.hash.substring(1);
         
-        // --- CRITICAL AND FINAL FIX ---
-        // The Telegram client appends its own data starting with a '?'.
-        // We must find that '?' and cut it and everything after it off.
         const tgDataIndex = rawHash.indexOf('?');
         if (tgDataIndex !== -1) {
             rawHash = rawHash.substring(0, tgDataIndex);
@@ -32,19 +52,20 @@ document.addEventListener('DOMContentLoaded', function () {
         
         if (rawHash) {
             try {
-                const base64String = decodeURIComponent(rawHash);
-                const decodedJsonString = b64DecodeUnicode(base64String);
+                // --- Use the new, robust URL-safe decoder ---
+                const decodedJsonString = urlBase64Decode(rawHash);
                 const initialData = JSON.parse(decodedJsonString);
                 populateForm(initialData);
             } catch (e) {
                 loadingChatsP.innerHTML = `
                     <p><strong>Fatal Error:</strong> Could not parse initial data.</p>
+                    <p>This can happen if the URL data is corrupted or too long.</p>
                     <p><strong>Error:</strong> ${e.message}</p>
                 `;
                 console.error('URL/Base64/JSON parsing failed:', e);
             }
         } else {
-            loadingChatsP.innerText = 'Error: No initial data found in URL. Please try again.';
+            loadingChatsP.innerText = 'Error: No initial data in URL. Please try again.';
         }
     }
 
@@ -94,3 +115,4 @@ document.addEventListener('DOMContentLoaded', function () {
         tg.sendData(JSON.stringify(dataToSend));
     });
 });
+
