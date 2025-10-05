@@ -16,50 +16,52 @@ document.addEventListener('DOMContentLoaded', function () {
         }).join(''));
     }
 
+    // Use a short timeout to ensure the window.location.hash is ready
     setTimeout(loadInitialData, 100);
 
     function loadInitialData() {
-        const rawHash = window.location.hash.substring(1);
+        let rawHash = window.location.hash.substring(1);
+        
+        // --- CRITICAL AND FINAL FIX ---
+        // The Telegram client appends its own data starting with a '?'.
+        // We must find that '?' and cut it and everything after it off.
+        const tgDataIndex = rawHash.indexOf('?');
+        if (tgDataIndex !== -1) {
+            rawHash = rawHash.substring(0, tgDataIndex);
+        }
+        
         if (rawHash) {
             try {
-                // The raw hash is now fully URL-encoded, so we must decode it.
                 const base64String = decodeURIComponent(rawHash);
                 const decodedJsonString = b64DecodeUnicode(base64String);
                 const initialData = JSON.parse(decodedJsonString);
                 populateForm(initialData);
             } catch (e) {
-                // --- ROBUST DEBUGGING ---
                 loadingChatsP.innerHTML = `
-                    <p><strong>Fatal Error:</strong> Could not parse initial data from URL.</p>
-                    <p>This is likely a data encoding issue.</p>
-                    <p><strong>Error Details:</strong> ${e.message}</p>
-                    <textarea readonly>${rawHash}</textarea>
+                    <p><strong>Fatal Error:</strong> Could not parse initial data.</p>
+                    <p><strong>Error:</strong> ${e.message}</p>
                 `;
                 console.error('URL/Base64/JSON parsing failed:', e);
-                console.error('Received raw hash:', rawHash);
             }
         } else {
-            loadingChatsP.innerText = 'Error: No initial data found in URL. Please try launching from Telegram again.';
+            loadingChatsP.innerText = 'Error: No initial data found in URL. Please try again.';
         }
     }
 
     function populateForm(data) {
+        // ... (This function is unchanged from the previous version) ...
         loadingChatsP.style.display = 'none';
         tg.MainButton.show();
-
         messageTextarea.value = data.config.message || '';
         imageUrlInput.value = data.config.image_url || '';
-
         if (!data.chats || data.chats.length === 0) {
             chatListContainer.innerHTML = '<p>Could not find any groups or channels in your account.</p>';
             return;
         }
-
         data.chats.forEach(chat => {
             const savedGroup = data.config.groups ? data.config.groups[String(chat.id)] : null;
             const isChecked = savedGroup ? 'checked' : '';
             const intervalValue = savedGroup ? savedGroup.interval_hours : '';
-
             const div = document.createElement('div');
             div.className = 'chat-item';
             div.innerHTML = `
@@ -76,28 +78,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     tg.MainButton.onClick(() => {
+        // ... (This function is unchanged from the previous version) ...
         const message = messageTextarea.value;
         const imageUrl = imageUrlInput.value.trim();
         const groups = {};
-
         document.querySelectorAll('.chat-selector input[type="checkbox"]:checked').forEach(checkbox => {
             const id = checkbox.value;
             const intervalInput = document.querySelector(`.group-interval[data-id="${id}"]`);
             const interval = parseFloat(intervalInput.value);
-
             if (id && !isNaN(interval) && interval > 0) {
                 groups[id] = { interval_hours: interval };
             }
         });
-
-        const dataToSend = {
-            type: "save",
-            message: message,
-            image_url: imageUrl,
-            groups: groups
-        };
-
+        const dataToSend = { type: "save", message: message, image_url: imageUrl, groups: groups };
         tg.sendData(JSON.stringify(dataToSend));
     });
 });
-
