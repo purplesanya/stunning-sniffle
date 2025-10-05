@@ -1,0 +1,69 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    padding: 15px;
+    background-color: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+h1, h2 {
+    color: var(--tg-theme-hint-color);
+}
+
+.form-group, .group-entry {
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+textarea, input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--tg-theme-hint-color);
+    border-radius: 5px;
+    background-color: var(--tg-theme-secondary-bg-color);
+    color: var(--tg-theme-text-color);
+    box-sizing: border-box;
+}
+
+.btn, .remove-btn {
+    display: inline-block;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn {
+    background-color: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
+    width: 100%;
+}
+
+.group-entry {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid var(--tg-theme-secondary-bg-color);
+    border-radius: 8px;
+}
+
+.group-entry input {
+    flex-grow: 1;
+}
+
+.remove-btn {
+    background-color: #e74c3c;
+    color: white;
+    padding: 5px 10px;
+    font-size: 12px;
+}

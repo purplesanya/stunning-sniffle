@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Sender Config</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Message Configuration</h1>
+
+        <div class="form-group">
+            <label for="message">Message to Send (Supports Markdown)</label>
+            <textarea id="message" rows="5" placeholder="Enter the message you want to send..."></textarea>
+        </div>
+
+        <h2>Target Groups</h2>
+        <div id="groups-container">
+            <!-- Group entries will be added here by JavaScript -->
+        </div>
+
+        <button id="add-group-btn" class="btn">Add Group</button>
+        <hr>
+        <!-- The main button is controlled by JavaScript via the Telegram API -->
+    </div>
+
+    <!-- Telegram Web App Script -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
