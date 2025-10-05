@@ -12,22 +12,27 @@
         
         <div class="form-group">
             <label for="message">Message to Send (Caption)</label>
-            <textarea id="message" rows="5" placeholder="Enter the message you want to send..."></textarea>
+            <textarea id="message" rows="5" placeholder="Enter the message..."></textarea>
         </div>
 
-        <!-- NEW: Image URL Field -->
         <div class="form-group">
             <label for="image-url">Image URL (Optional)</label>
             <input type="text" id="image-url" placeholder="https://example.com/image.jpg">
         </div>
 
-        <h2>Target Groups</h2>
-        <div id="groups-container">
-            <!-- Group entries will be added here by JavaScript -->
+        <hr>
+        <h2>Select Target Chats</h2>
+        <div id="chat-selection-container">
+            <p id="loading-chats">Loading your chats...</p>
+            <!-- Checkboxes will be dynamically inserted here -->
         </div>
 
-        <button id="add-group-btn" class="btn">Add Group</button>
         <hr>
+        <h2>Configure Selected Chats</h2>
+        <div id="groups-config-container">
+             <p id="no-chats-selected">Select a chat above to configure its schedule.</p>
+            <!-- Interval inputs for selected chats will be inserted here -->
+        </div>
     </div>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
