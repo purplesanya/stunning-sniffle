@@ -10,21 +10,21 @@ document.addEventListener('DOMContentLoaded', function () {
     tg.expand();
     tg.MainButton.text = "Save Configuration";
 
-    // --- CRITICAL FIX: ---
-    // Use a short timeout to ensure the window.location.hash has been
-    // populated by the browser before we try to read it. This solves the race condition.
-    setTimeout(loadInitialData, 100); // 100 millisecond delay is plenty.
+    // Use a short timeout to ensure the window.location.hash is ready
+    setTimeout(loadInitialData, 100);
 
     function loadInitialData() {
         const hash = window.location.hash.substring(1);
         if (hash) {
             try {
-                const decodedData = decodeURIComponent(hash);
-                const initialData = JSON.parse(decodedData);
+                // --- NEW: Base64 Decoding Step ---
+                // atob() is the native browser function to decode Base64
+                const decodedJsonString = atob(hash);
+                const initialData = JSON.parse(decodedJsonString);
                 populateForm(initialData);
             } catch (e) {
                 loadingChatsP.innerText = 'Error: Could not parse initial data from URL.';
-                console.error(e);
+                console.error('Base64 decoding or JSON parsing failed:', e);
             }
         } else {
             loadingChatsP.innerText = 'Error: No initial data found in URL. Please try launching from Telegram again.';
@@ -44,6 +44,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         data.chats.forEach(chat => {
+            // IMPORTANT: The keys in the saved 'groups' object are strings.
+            // We must convert the integer chat.id to a string for the lookup to work.
             const savedGroup = data.config.groups ? data.config.groups[String(chat.id)] : null;
             const isChecked = savedGroup ? 'checked' : '';
             const intervalValue = savedGroup ? savedGroup.interval_hours : '';
@@ -69,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const groups = {};
 
         document.querySelectorAll('.chat-selector input[type="checkbox"]:checked').forEach(checkbox => {
-            const id = checkbox.value;
+            const id = checkbox.value; // This is a string
             const intervalInput = document.querySelector(`.group-interval[data-id="${id}"]`);
             const interval = parseFloat(intervalInput.value);
 
