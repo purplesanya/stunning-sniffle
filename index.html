@@ -9,10 +9,16 @@
 <body>
     <div class="container">
         <h1>Message Configuration</h1>
-
+        
         <div class="form-group">
-            <label for="message">Message to Send (Supports Markdown)</label>
+            <label for="message">Message to Send (Caption)</label>
             <textarea id="message" rows="5" placeholder="Enter the message you want to send..."></textarea>
+        </div>
+
+        <!-- NEW: Image URL Field -->
+        <div class="form-group">
+            <label for="image-url">Image URL (Optional)</label>
+            <input type="text" id="image-url" placeholder="https://example.com/image.jpg">
         </div>
 
         <h2>Target Groups</h2>
@@ -22,10 +28,8 @@
 
         <button id="add-group-btn" class="btn">Add Group</button>
         <hr>
-        <!-- The main button is controlled by JavaScript via the Telegram API -->
     </div>
-
-    <!-- Telegram Web App Script -->
+    
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="app.js"></script>
 </body>
