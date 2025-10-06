@@ -115,19 +115,29 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 2000); // 2-second cooldown
     }
 
-    tg.MainButton.onClick(() => {
-        // ... (This function is unchanged) ...
+   tg.MainButton.onClick(() => {
         const message = messageTextarea.value;
         const imageUrl = imageUrlInput.value.trim();
         const groups = {};
+        let hasValidGroups = false;
+
         document.querySelectorAll('.chat-selector input[type="checkbox"]:checked').forEach(checkbox => {
             const id = checkbox.value;
             const intervalInput = document.querySelector(`.group-interval[data-id="${id}"]`);
             const interval = parseFloat(intervalInput.value);
+
             if (id && !isNaN(interval) && interval > 0) {
                 groups[id] = { interval_hours: interval };
+                hasValidGroups = true;
             }
         });
+        
+        // --- CRITICAL FIX: Prevent saving if no valid groups are configured ---
+        if (!hasValidGroups) {
+            tg.showAlert("No chats selected or no valid intervals provided. Please check a chat and enter a positive number for the hours.");
+            return; // Stop the save process
+        }
+        
         const dataToSend = { type: "save", message: message, image_url: imageUrl, groups: groups };
         tg.sendData(JSON.stringify(dataToSend));
     });
