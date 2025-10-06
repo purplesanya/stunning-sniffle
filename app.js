@@ -1,35 +1,26 @@
 document.addEventListener('DOMContentLoaded', function () {
     const tg = window.Telegram.WebApp;
 
+    // --- DOM Elements ---
     const messageTextarea = document.getElementById('message');
     const imageUrlInput = document.getElementById('image-url');
     const chatListContainer = document.getElementById('chat-list-container');
     const loadingChatsP = document.getElementById('loading-chats');
 
+    // --- Setup ---
     tg.ready();
     tg.expand();
     tg.MainButton.text = "Save Configuration";
 
-    // --- CRITICAL FIX: A robust URL-safe Base64 decoder ---
+    // --- Robust URL-safe Base64 decoder ---
     function urlBase64Decode(str) {
-        // Step 1: Replace URL-safe characters with standard Base64 characters
         let output = str.replace(/-/g, '+').replace(/_/g, '/');
-
-        // Step 2: Add padding if it's missing
         switch (output.length % 4) {
-            case 0:
-                break;
-            case 2:
-                output += '==';
-                break;
-            case 3:
-                output += '=';
-                break;
-            default:
-                throw 'Illegal base64url string!';
+            case 0: break;
+            case 2: output += '=='; break;
+            case 3: output += '='; break;
+            default: throw 'Illegal base64url string!';
         }
-
-        // Step 3: Decode the standard Base64 string and then the UTF-8
         try {
             return decodeURIComponent(atob(output).split('').map(function(c) {
                 return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
@@ -44,24 +35,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function loadInitialData() {
         let rawHash = window.location.hash.substring(1);
-        
         const tgDataIndex = rawHash.indexOf('?');
         if (tgDataIndex !== -1) {
             rawHash = rawHash.substring(0, tgDataIndex);
         }
-        
         if (rawHash) {
             try {
-                // --- Use the new, robust URL-safe decoder ---
                 const decodedJsonString = urlBase64Decode(rawHash);
                 const initialData = JSON.parse(decodedJsonString);
                 populateForm(initialData);
             } catch (e) {
-                loadingChatsP.innerHTML = `
-                    <p><strong>Fatal Error:</strong> Could not parse initial data.</p>
-                    <p>This can happen if the URL data is corrupted or too long.</p>
-                    <p><strong>Error:</strong> ${e.message}</p>
-                `;
+                loadingChatsP.innerHTML = `<p><strong>Fatal Error:</strong> Could not parse initial data.</p><p><strong>Error:</strong> ${e.message}</p>`;
                 console.error('URL/Base64/JSON parsing failed:', e);
             }
         } else {
@@ -70,19 +54,21 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function populateForm(data) {
-        // ... (This function is unchanged from the previous version) ...
         loadingChatsP.style.display = 'none';
         tg.MainButton.show();
         messageTextarea.value = data.config.message || '';
         imageUrlInput.value = data.config.image_url || '';
+
         if (!data.chats || data.chats.length === 0) {
             chatListContainer.innerHTML = '<p>Could not find any groups or channels in your account.</p>';
             return;
         }
+
         data.chats.forEach(chat => {
             const savedGroup = data.config.groups ? data.config.groups[String(chat.id)] : null;
             const isChecked = savedGroup ? 'checked' : '';
             const intervalValue = savedGroup ? savedGroup.interval_hours : '';
+
             const div = document.createElement('div');
             div.className = 'chat-item';
             div.innerHTML = `
@@ -92,14 +78,45 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 <div class="interval-input">
                     <input type="number" class="group-interval" placeholder="Hours" value="${intervalValue}" data-id="${chat.id}">
+                    <!-- NEW: Test Send Button -->
+                    <button class="test-btn" data-id="${chat.id}">Test</button>
                 </div>
             `;
             chatListContainer.appendChild(div);
         });
+
+        // Add event listeners to all new test buttons
+        document.querySelectorAll('.test-btn').forEach(button => {
+            button.addEventListener('click', handleTestSend);
+        });
+    }
+
+    function handleTestSend(event) {
+        const testButton = event.target;
+        const chatId = testButton.getAttribute('data-id');
+        
+        // Temporarily disable button to prevent multiple clicks
+        testButton.innerText = '...';
+        testButton.disabled = true;
+
+        const dataToSend = {
+            type: "test_send",
+            message: messageTextarea.value,
+            image_url: imageUrlInput.value.trim(),
+            test_chat_id: chatId
+        };
+
+        tg.sendData(JSON.stringify(dataToSend));
+        
+        // Re-enable the button after a short delay
+        setTimeout(() => {
+            testButton.innerText = 'Test';
+            testButton.disabled = false;
+        }, 2000); // 2-second cooldown
     }
 
     tg.MainButton.onClick(() => {
-        // ... (This function is unchanged from the previous version) ...
+        // ... (This function is unchanged) ...
         const message = messageTextarea.value;
         const imageUrl = imageUrlInput.value.trim();
         const groups = {};
@@ -115,4 +132,3 @@ document.addEventListener('DOMContentLoaded', function () {
         tg.sendData(JSON.stringify(dataToSend));
     });
 });
-
