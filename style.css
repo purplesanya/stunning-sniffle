@@ -85,3 +85,23 @@ textarea, input {
 .interval-input input {
     width: 80px; /* Make interval input smaller */
 }
+.interval-input {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.test-btn {
+    padding: 3px 8px;
+    font-size: 12px;
+    background-color: #3390ec; /* A slightly different blue */
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.test-btn:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+}
