@@ -3,32 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram Sender Config</title>
+    <title>Message Configuration</title>
+    <!-- Link to the external CSS file -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Message Configuration</h1>
-        
-        <div class="form-group">
-            <label for="message">Message to Send (Caption)</label>
-            <textarea id="message" rows="5" placeholder="Enter the message..."></textarea>
-        </div>
 
-        <div class="form-group">
-            <label for="image-url">Image URL (Optional)</label>
-            <input type="text" id="image-url" placeholder="https://example.com/image.jpg">
-        </div>
+    <div class="form-group">
+        <label for="message">Message Content</label>
+        <textarea id="message" rows="5" placeholder="Enter your message here..."></textarea>
+    </div>
 
-        <hr>
-        <h2>Select & Configure Target Chats</h2>
-        <div id="chat-list-container">
-            <p id="loading-chats">Loading data...</p>
-            <!-- Chat list and interval inputs will be dynamically inserted here -->
+    <div class="form-group">
+        <label>Select Groups/Channels</label>
+        <div id="group-list">
+            <p>Loading groups...</p>
         </div>
     </div>
     
+    <div class="form-group">
+        <label for="interval">Send Every...</label>
+        <select id="interval">
+            <option value="5">5 Minutes</option>
+            <option value="10">10 Minutes</option>
+            <option value="15">15 Minutes</option>
+            <option value="30">30 Minutes</option>
+            <option value="60" selected>1 Hour</option>
+            <option value="120">2 Hours</option>
+            <option value="360">6 Hours</option>
+            <option value="720">12 Hours</option>
+            <option value="1440">24 Hours</option>
+        </select>
+    </div>
+
+    <button id="send-data">Save Configuration</button>
+
+    <!-- Scripts -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="app.js"></script>
+    <!-- Link to the external JavaScript file -->
+    <script src="script.js"></script>
 </body>
 </html>
