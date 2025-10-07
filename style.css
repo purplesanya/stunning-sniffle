@@ -1,107 +1,70 @@
+/* style.css */
+
+:root {
+    --tg-theme-bg-color: #ffffff;
+    --tg-theme-text-color: #000000;
+    --tg-theme-button-color: #3390ec;
+    --tg-theme-button-text-color: #ffffff;
+}
+
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     padding: 15px;
     background-color: var(--tg-theme-bg-color);
     color: var(--tg-theme-text-color);
+    margin: 0;
 }
 
-.container {
-    max-width: 900px;
-    margin: 0 auto;
-}
-
-h1, h2 {
-    color: var(--tg-theme-hint-color);
-}
-
-.form-group, .group-entry {
-    margin-bottom: 15px;
+.form-group {
+    margin-bottom: 20px;
 }
 
 label {
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
+    font-weight: 600;
 }
 
-textarea, input {
+textarea, select {
     width: 100%;
-    padding: 10px;
-    border: 1px solid var(--tg-theme-hint-color);
-    border-radius: 5px;
-    background-color: var(--tg-theme-secondary-bg-color);
-    color: var(--tg-theme-text-color);
+    padding: 12px;
     box-sizing: border-box;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+    background-color: #f9f9f9;
 }
 
-.btn, .remove-btn {
-    display: inline-block;
-    padding: 10px 15px;
-    border: none;
-    border-radius: 5px;
+#group-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 10px;
+    background-color: #f9f9f9;
+}
+
+.group-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
     cursor: pointer;
-    font-weight: bold;
 }
 
-.btn {
+.group-item input {
+    margin-right: 10px;
+    width: 18px;
+    height: 18px;
+}
+
+button {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
     background-color: var(--tg-theme-button-color);
     color: var(--tg-theme-button-text-color);
-    width: 100%;
-}
-
-.group-entry {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    padding: 10px;
-    border: 1px solid var(--tg-theme-secondary-bg-color);
-    border-radius: 8px;
-}
-
-.group-entry input {
-    flex-grow: 1;
-}
-
-.remove-btn {
-    background-color: #e74c3c;
-    color: white;
-    padding: 5px 10px;
-    font-size: 12px;
-
-}
-.chat-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px;
-    border-bottom: 1px solid var(--tg-theme-secondary-bg-color);
-}
-
-.chat-selector {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.interval-input input {
-    width: 80px; /* Make interval input smaller */
-}
-.interval-input {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.test-btn {
-    padding: 3px 8px;
-    font-size: 12px;
-    background-color: #3390ec; /* A slightly different blue */
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.test-btn:disabled {
-    background-color: #555;
-    cursor: not-allowed;
 }
