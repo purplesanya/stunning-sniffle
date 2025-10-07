@@ -1,88 +1,37 @@
+<!-- index.html -->
+<!-- Host this on GitHub Pages: https://yourusername.github.io/telegram-webapp/ -->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram Message Scheduler</title>
+    <title>Message Scheduler</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>📅 Message Scheduler</h1>
-            <p class="subtitle">Schedule messages to your Telegram groups</p>
-        </header>
-
-        <div id="setupCheck" class="card">
-            <div class="loading">
-                <div class="spinner"></div>
-                <p>Checking setup status...</p>
-            </div>
-        </div>
-
-        <div id="mainInterface" style="display: none;">
-            <div class="card">
-                <h2>📝 Schedule New Message</h2>
-                
-                <div class="form-group">
-                    <label for="groupSelect">Select Group</label>
-                    <select id="groupSelect" class="input-field">
-                        <option value="">Loading groups...</option>
-                    </select>
-                    <button id="refreshGroups" class="btn btn-secondary">🔄 Refresh Groups</button>
-                </div>
-
-                <div class="form-group">
-                    <label for="messageText">Message</label>
-                    <textarea id="messageText" class="input-field" rows="5" placeholder="Enter your message here..."></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label for="intervalInput">Interval (seconds)</label>
-                    <input type="number" id="intervalInput" class="input-field" min="60" value="3600" placeholder="3600">
-                    <small class="help-text">Minimum: 60 seconds (1 minute)</small>
-                </div>
-
-                <button id="scheduleBtn" class="btn btn-primary">✅ Schedule Message</button>
-            </div>
-
-            <div class="card">
-                <h2>📊 Status</h2>
-                <div id="statusContainer">
-                    <p class="text-muted">No active scheduled messages</p>
-                </div>
-                <button id="refreshStatus" class="btn btn-secondary">🔄 Refresh Status</button>
-            </div>
-
-            <div class="card info-card">
-                <h3>ℹ️ How to use</h3>
-                <ol>
-                    <li>Select a group from the dropdown</li>
-                    <li>Enter your message</li>
-                    <li>Set the interval in seconds</li>
-                    <li>Click "Schedule Message"</li>
-                </ol>
-                <p class="warning">⚠️ Make sure you have admin rights in the selected group</p>
-            </div>
-        </div>
-
-        <div id="errorContainer" style="display: none;">
-            <div class="card error-card">
-                <h2>⚠️ Setup Required</h2>
-                <p>Please complete the bot setup first:</p>
-                <ol>
-                    <li>Send /setup to the bot</li>
-                    <li>Follow the instructions to provide your API credentials</li>
-                    <li>Complete the authentication process</li>
-                </ol>
-                <button id="closeApp" class="btn btn-secondary">Close</button>
-            </div>
-        </div>
+        <h1>Configure Scheduled Messages</h1>
+        <form id="scheduleForm">
+            <label for="group">Group Username (e.g., @group):</label>
+            <input type="text" id="group" required>
+            
+            <label for="message">Message:</label>
+            <textarea id="message" required></textarea>
+            
+            <label for="interval">Interval (seconds):</label>
+            <input type="number" id="interval" min="60" value="3600" required>
+            
+            <label for="startTime">Start Time (YYYY-MM-DD HH:MM):</label>
+            <input type="datetime-local" id="startTime" required>
+            
+            <button type="submit">Schedule Message</button>
+        </form>
+        
+        <div id="status"></div>
     </div>
-
-    <div id="notification" class="notification"></div>
-
-    <script src="app.js"></script>
+    
+    <script src="script.js"></script>
 </body>
 </html>
