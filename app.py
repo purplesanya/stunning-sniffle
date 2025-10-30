@@ -1,9 +1,13 @@
-# app.py - Enhanced version with caching and better error handling
-from flask import Flask, render_template, request, send_file, jsonify
-from flibusta_utils import search_authors, find_books, download_books_in_memory
+# app.py
+from flask import Flask, render_template, request, jsonify, send_from_directory
+from flibusta_utils import search_authors, find_books, download_books_to_disk
 from functools import lru_cache
 from datetime import datetime, timedelta
 import logging
+import uuid
+import threading
+import tempfile
+import os
 
 app = Flask(__name__)
 
@@ -14,6 +18,11 @@ logger = logging.getLogger(__name__)
 # Simple in-memory cache with expiration
 cache = {}
 CACHE_DURATION = timedelta(hours=1)
+
+# This dictionary will hold the status of our background jobs.
+# In a real multi-worker setup, you'd use Redis or a database for this.
+# For Render's single-worker free tier, this is okay.
+JOBS = {}
 
 
 def get_cached(key):
@@ -135,39 +144,49 @@ def api_books(author_id):
         return jsonify({"error": "Failed to fetch books", "books": []}), 500
 
 
-@app.route("/download", methods=["POST"])
-def download():
-    try:
-        book_links = request.form.getlist("book_links")
-        book_titles = request.form.getlist("book_titles")
-        file_format = request.form.get("format", "epub").lower()
+@app.route("/start-download", methods=["POST"])
+def start_download_job():
+    data = request.json
+    book_links = data.get("book_links", [])
+    book_titles = data.get("book_titles", [])
+    file_format = data.get("format", "epub")
+    author_name = data.get("author_name", "")
 
-        # Validate inputs
-        if not book_links or not book_titles:
-            return jsonify({"error": "No books selected"}), 400
+    if not book_links or len(book_links) != len(book_titles):
+        return jsonify({"error": "Invalid book data"}), 400
 
-        if len(book_links) != len(book_titles):
-            return jsonify({"error": "Invalid book data"}), 400
+    job_id = str(uuid.uuid4())
+    books = list(zip(book_titles, book_links))
 
-        if file_format not in ["epub", "fb2", "mobi"]:
-            file_format = "epub"
+    # Set initial status
+    JOBS[job_id] = {"status": "pending", "progress": 0, "message": "Job received"}
 
-        books = list(zip(book_titles, book_links))
-        logger.info(f"Downloading {len(books)} book(s) in {file_format} format")
+    # Start the download process in a background thread
+    thread = threading.Thread(
+        target=download_books_to_disk,
+        args=(job_id, books, file_format, author_name, JOBS)
+    )
+    thread.start()
 
-        filename, buffer, mimetype = download_books_in_memory(books, file_format)
-        buffer.seek(0)
+    return jsonify({"job_id": job_id})
 
-        return send_file(
-            buffer,
-            as_attachment=True,
-            download_name=filename,
-            mimetype=mimetype
-        )
 
-    except Exception as e:
-        logger.error(f"Error during download: {str(e)}")
-        return jsonify({"error": "Download failed"}), 500
+@app.route("/job-status/<job_id>")
+def get_job_status(job_id):
+    job = JOBS.get(job_id)
+    if not job:
+        return jsonify({"status": "error", "message": "Job not found"}), 404
+    return jsonify(job)
+
+
+@app.route("/fetch/<filename>")
+def fetch_file(filename):
+    # Security: Ensure filename is safe
+    if ".." in filename or filename.startswith("/"):
+        return "Invalid filename", 400
+    
+    # Serve the file from the system's temporary directory
+    return send_from_directory(tempfile.gettempdir(), filename, as_attachment=True)
 
 
 @app.route("/api/cache/clear", methods=["POST"])
