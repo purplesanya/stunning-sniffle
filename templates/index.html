@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flibusta Downloader</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #13131a;
+      --bg-card: #1a1a24;
+      --text-primary: #e8e8f0;
+      --text-secondary: #9494a8;
+      --accent: #8b5cf6;
+      --accent-hover: #a78bfa;
+      --accent-dark: #6d28d9;
+      --border: #2a2a38;
+      --shadow: rgba(139, 92, 246, 0.15);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(135deg, var(--bg-primary) 0%, #0f0a1a 100%);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      padding: 2rem;
+      position: relative;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    body::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.03) 0%, transparent 50%);
+      animation: pulse 15s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.5; }
+      50% { transform: scale(1.1); opacity: 0.8; }
+    }
+
+    .container-main {
+      position: relative;
+      z-index: 1;
+      max-width: 800px;
+      width: 100%;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 3rem;
+      animation: fadeInDown 0.8s ease;
+    }
+
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 1.125rem;
+      font-weight: 400;
+    }
+
+    .search-wrapper {
+      animation: fadeInUp 0.8s ease 0.2s backwards;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .search-box {
+      display: flex;
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(139, 92, 246, 0.1);
+    }
+
+    .search-box:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 8px 32px rgba(139, 92, 246, 0.2), 0 0 0 3px rgba(139, 92, 246, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .search-box input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      padding: 1.125rem 1.5rem;
+      color: var(--text-primary);
+      font-size: 1.0625rem;
+      outline: none;
+    }
+
+    .search-box input::placeholder {
+      color: var(--text-secondary);
+    }
+
+    .search-box button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 1.125rem 2rem;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .search-box button::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width 0.6s, height 0.6s;
+    }
+
+    .search-box button:hover::before {
+      width: 300px;
+      height: 300px;
+    }
+
+    .search-box button:hover {
+      background: var(--accent-hover);
+      transform: translateX(2px);
+    }
+
+    .search-box button:active {
+      transform: translateX(2px) scale(0.98);
+    }
+
+    /* Recent Searches */
+    .recent-searches {
+      margin-top: 1.5rem;
+      animation: fadeIn 0.6s ease 0.4s backwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .recent-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      padding: 0 0.25rem;
+    }
+
+    .recent-title {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .clear-recent {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .clear-recent:hover {
+      color: var(--accent);
+      background: rgba(139, 92, 246, 0.1);
+    }
+
+    .recent-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .recent-chip {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .recent-chip:hover {
+      border-color: var(--accent);
+      background: rgba(139, 92, 246, 0.1);
+      transform: translateY(-1px);
+    }
+
+    .recent-chip::before {
+      content: '🕐';
+      font-size: 1rem;
+    }
+
+    .results {
+      margin-top: 3rem;
+      animation: fadeInUp 0.6s ease;
+    }
+
+    .results-header {
+      margin-bottom: 1.5rem;
+      padding: 0 0.5rem;
+    }
+
+    .results-header h4 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0;
+    }
+
+    .results-header .query-text {
+      color: var(--accent-hover);
+      font-weight: 700;
+    }
+
+    .results-count {
+      color: var(--text-secondary);
+      font-size: 0.9375rem;
+      margin-top: 0.25rem;
+    }
+
+    .author-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 0.75rem;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .author-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--accent);
+      transform: scaleY(0);
+      transition: transform 0.3s ease;
+    }
+
+    .author-card:hover::before {
+      transform: scaleY(1);
+    }
+
+    .author-card:hover {
+      background: var(--bg-secondary);
+      border-color: var(--accent);
+      transform: translateX(8px);
+      box-shadow: 0 4px 20px var(--shadow);
+    }
+
+    .author-card:active {
+      transform: translateX(8px) scale(0.98);
+    }
+
+    .author-name {
+      color: var(--text-primary);
+      font-size: 1.0625rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .author-name::after {
+      content: '→';
+      opacity: 0;
+      transition: all 0.3s ease;
+      color: var(--accent);
+      font-size: 1.25rem;
+    }
+
+    .author-card:hover .author-name::after {
+      opacity: 1;
+      transform: translateX(4px);
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    /* Loading State */
+    .loading-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(10, 10, 15, 0.8);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .loading-overlay.active {
+      display: flex;
+    }
+
+    .loading-content {
+      text-align: center;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-secondary);
+      animation: fadeIn 0.6s ease;
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 1rem;
+      }
+
+      h1 {
+        font-size: 2rem;
+      }
+
+      .subtitle {
+        font-size: 1rem;
+      }
+
+      .search-box input {
+        padding: 1rem 1.25rem;
+        font-size: 1rem;
+      }
+
+      .search-box button {
+        padding: 1rem 1.5rem;
+      }
+
+      .author-card {
+        padding: 1rem 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <div class="loading-text">Searching...</div>
+    </div>
+  </div>
+
+  <div class="container-main">
+    <div class="header">
+      <h1>📚 Flibusta Downloader</h1>
+      <p class="subtitle">Find your favorite authors and download their books instantly</p>
+    </div>
+
+    <div class="search-wrapper">
+      <form method="POST" class="search-box" id="searchForm">
+        <input
+          name="author"
+          id="searchInput"
+          placeholder="Search for an author..."
+          required
+          autocomplete="off"
+        >
+        <button type="submit">Search</button>
+      </form>
+
+      <div class="recent-searches" id="recentSearches" style="display: none;">
+        <div class="recent-header">
+          <span class="recent-title">Recent Searches</span>
+          <button type="button" class="clear-recent" id="clearRecent">Clear</button>
+        </div>
+        <div class="recent-chips" id="recentChips"></div>
+      </div>
+    </div>
+
+    {% if authors %}
+    <div class="results">
+      <div class="results-header">
+        <h4>Results for "<span class="query-text">{{ author_query }}</span>"</h4>
+        <div class="results-count">{{ authors|length }} author(s) found</div>
+      </div>
+      {% for name, id in authors %}
+        <a href="{{ url_for('books', author_id=id) }}">
+          <div class="author-card">
+            <div class="author-name">{{ name }}</div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+    {% elif author_query %}
+    <div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <h4>No authors found</h4>
+      <p>Try searching with a different name or spelling</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <script>
+    const searchForm = document.getElementById('searchForm');
+    const searchInput = document.getElementById('searchInput');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const recentSearches = document.getElementById('recentSearches');
+    const recentChips = document.getElementById('recentChips');
+    const clearRecent = document.getElementById('clearRecent');
+
+    const STORAGE_KEY = 'recentSearches';
+    const MAX_RECENT = 5;
+
+    // Load recent searches
+    function loadRecentSearches() {
+      const recent = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      if (recent.length > 0) {
+        recentSearches.style.display = 'block';
+        recentChips.innerHTML = '';
+        recent.forEach(search => {
+          const chip = document.createElement('div');
+          chip.className = 'recent-chip';
+          chip.textContent = search;
+          chip.addEventListener('click', () => {
+            searchInput.value = search;
+            searchForm.submit();
+          });
+          recentChips.appendChild(chip);
+        });
+      }
+    }
+
+    // Save search to recent
+    function saveRecentSearch(query) {
+      let recent = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+      // Remove if already exists
+      recent = recent.filter(s => s.toLowerCase() !== query.toLowerCase());
+
+      // Add to beginning
+      recent.unshift(query);
+
+      // Keep only MAX_RECENT items
+      recent = recent.slice(0, MAX_RECENT);
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(recent));
+    }
+
+    // Clear recent searches
+    clearRecent.addEventListener('click', () => {
+      localStorage.removeItem(STORAGE_KEY);
+      recentSearches.style.display = 'none';
+    });
+
+    // Form submission
+    searchForm.addEventListener('submit', (e) => {
+      const query = searchInput.value.trim();
+      if (query) {
+        saveRecentSearch(query);
+        loadingOverlay.classList.add('active');
+      }
+    });
+
+    // Auto-focus search input
+    searchInput.focus();
+
+    // Load recent searches on page load
+    loadRecentSearches();
+
+    // If we have search results, save the query
+    {% if author_query %}
+    saveRecentSearch('{{ author_query }}');
+    loadRecentSearches();
+    {% endif %}
+
+    // Keyboard shortcut: / to focus search
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement !== searchInput) {
+        e.preventDefault();
+        searchInput.focus();
+      }
+    });
+  </script>
+</body>
+</html>
