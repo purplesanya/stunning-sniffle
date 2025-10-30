@@ -1,0 +1,6 @@
+Flask
+requests
+beautifulsoup4
+py7zr
+urllib3
+gunicorn
