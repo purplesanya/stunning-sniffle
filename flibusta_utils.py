@@ -1,4 +1,4 @@
-# flibusta_utils.py - Enhanced version with retry logic and rate limiting
+# flibusta_utils.py
 import io
 import time
 import requests
@@ -8,6 +8,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import logging
+import os
+import tempfile
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -141,40 +144,25 @@ def find_books(author_id, file_format, max_retries=3):
     return []
 
 
-def _fetch_book_bytes(title, link, max_retries=3):
-    """Downloads a single book and returns its (title, bytes) with retry logic."""
+def _fetch_book_bytes(title, link):
+    """Downloads a single book and returns its (title, bytes)."""
     session = get_session()
-
-    for attempt in range(max_retries):
-        try:
-            rate_limit()
-            logger.info(f"Downloading: {title} (attempt {attempt + 1})")
-
-            r = session.get(link, stream=True, timeout=30)
-            r.raise_for_status()
-
-            # Read content in chunks to handle large files
-            content = b''
-            for chunk in r.iter_content(chunk_size=8192):
-                if chunk:
-                    content += chunk
-
-            logger.info(f"Successfully downloaded: {title} ({len(content)} bytes)")
-            return title, content
-
-        except requests.exceptions.RequestException as e:
-            logger.warning(f"Download attempt {attempt + 1} failed for {title}: {str(e)}")
-            if attempt == max_retries - 1:
-                logger.error(f"All download attempts failed for: {title}")
-                raise
-            time.sleep(2 ** attempt)
-
-    raise Exception(f"Failed to download {title}")
+    logger.info(f"Downloading: {title}")
+    try:
+        r = session.get(link, stream=True, timeout=60) # Increased timeout for slow downloads
+        r.raise_for_status()
+        content = b''
+        for chunk in r.iter_content(chunk_size=8192):
+            content += chunk
+        logger.info(f"Successfully downloaded: {title} ({len(content)} bytes)")
+        return title, content
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Download failed for {title}: {str(e)}")
+        raise
 
 
 def sanitize_filename(filename):
     """Sanitize filename to remove invalid characters"""
-    # Replace invalid characters
     invalid_chars = '<>:"/\\|?*'
     for char in invalid_chars:
         filename = filename.replace(char, '_')
@@ -189,72 +177,62 @@ def sanitize_filename(filename):
     return filename if filename else "untitled"
 
 
-def download_books_in_memory(books, file_format, author_name=None):
+def download_books_to_disk(job_id, books, file_format, author_name, jobs_dict):
     """
-    Downloads books with progress tracking.
-    - If 1 book: return that single file (filename, BytesIO, mimetype)
-    - If multiple: return 7z archive (filename, BytesIO, mimetype)
-
-    Args:
-        books: List of (title, link) tuples
-        file_format: Format of books (epub, fb2, mobi)
-        author_name: Optional author name for archive filename
+    Downloads books to a temporary directory on disk, creates a 7z archive,
+    and updates a shared dictionary with progress.
     """
     if not books:
-        raise ValueError("No books to download")
+        jobs_dict[job_id] = {"status": "error", "message": "No books selected"}
+        return
 
-    if len(books) == 1:
-        title, link = books[0]
-        logger.info(f"Downloading single book: {title}")
+    # Use a unique directory in the system's temp location
+    download_dir = tempfile.mkdtemp()
+    total_books = len(books)
+    books_downloaded = 0
 
-        _, data = _fetch_book_bytes(title, link)
-        safe_title = sanitize_filename(title)
-        filename = f"{safe_title}.{file_format}"
+    try:
+        # Step 1: Download all books to the temporary directory
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            future_to_book = {executor.submit(_fetch_book_bytes, title, link): title for title, link in books}
+            for future in as_completed(future_to_book):
+                try:
+                    title, data = future.result()
+                    safe_title = sanitize_filename(title)
+                    book_filename = f"{safe_title}.{file_format}"
+                    
+                    with open(os.path.join(download_dir, book_filename), "wb") as f:
+                        f.write(data)
+                    
+                    books_downloaded += 1
+                    progress = int((books_downloaded / total_books) * 90) # Downloading is 90% of the work
+                    jobs_dict[job_id] = {"status": "processing", "progress": progress, "message": f"Downloaded {books_downloaded}/{total_books}"}
+                
+                except Exception as e:
+                    title = future_to_book[future]
+                    logger.error(f"Skipping book {title} due to download error: {e}")
 
-        # Get proper MIME type
-        mime_types = {
-            "epub": "application/epub+zip",
-            "fb2": "application/xml",
-            "mobi": "application/x-mobipocket-ebook"
-        }
-        mimetype = mime_types.get(file_format, f"application/{file_format}")
+        # Step 2: Create the archive from the downloaded files
+        jobs_dict[job_id] = {"status": "processing", "progress": 95, "message": "Creating archive..."}
+        if author_name:
+            archive_name_base = f"{sanitize_filename(author_name)}_books"
+        else:
+            archive_name_base = "flibusta_books"
+        
+        archive_name = f"{archive_name_base}_{job_id[:8]}.7z"
+        archive_path = os.path.join(tempfile.gettempdir(), archive_name)
 
-        return filename, io.BytesIO(data), mimetype
+        with py7zr.SevenZipFile(archive_path, 'w') as archive:
+            archive.writeall(download_dir, arcname='') # arcname='' puts files in the root of the archive
 
-    # Multiple books → create .7z archive
-    logger.info(f"Creating archive with {len(books)} books")
+        # Step 3: Finalize the job status
+        jobs_dict[job_id] = {"status": "complete", "progress": 100, "filename": archive_name}
+        logger.info(f"Archive created successfully: {archive_path}")
 
-    # Create archive filename from author name or default
-    if author_name:
-        archive_name = f"{sanitize_filename(author_name)}_books.7z"
-    else:
-        archive_name = "books.7z"
-
-    # Download all books first
-    downloaded_books = {}
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = {executor.submit(_fetch_book_bytes, title, link): (title, link)
-                   for title, link in books}
-
-        for future in as_completed(futures):
-            try:
-                title, data = future.result()
-                safe_title = sanitize_filename(title)
-                book_filename = f"{safe_title}.{file_format}"
-                downloaded_books[book_filename] = data
-                logger.info(f"Downloaded: {title} ({len(data)} bytes)")
-            except Exception as e:
-                title, link = futures[future]
-                logger.error(f"Failed to download {title}: {str(e)}")
-
-    # Create archive with downloaded books
-    archive_buffer = io.BytesIO()
-    with py7zr.SevenZipFile(archive_buffer, mode="w") as archive:
-        for filename, data in downloaded_books.items():
-            archive.writestr(data, filename)
-            logger.info(f"Added to archive: {filename}")
-
-    archive_buffer.seek(0)
-    logger.info(f"Archive created successfully with {len(downloaded_books)} books")
-
-    return archive_name, archive_buffer, "application/x-7z-compressed"
+    except Exception as e:
+        logger.error(f"Error during job {job_id}: {e}")
+        jobs_dict[job_id] = {"status": "error", "message": "An unexpected error occurred."}
+    
+    finally:
+        # Clean up the directory with downloaded books
+        shutil.rmtree(download_dir)
