@@ -930,103 +930,86 @@
       saveSelections();
     });
 
-    // Form submission with progress
+    // *** NEW - Form submission with background jobs and polling ***
     downloadForm.addEventListener('submit', (e) => {
       e.preventDefault();
 
       const selectedCards = document.querySelectorAll('.book-card.selected');
-      const selectedBooks = selectedCards.length;
-
-      if (selectedBooks === 0) {
-        showToast('No Selection', 'Please select at least one book', 'error');
-        return;
+      if (selectedCards.length === 0) {
+          showToast('No Selection', 'Please select at least one book', 'error');
+          return;
       }
 
-      // Build FormData manually from selected books
-      const formData = new FormData();
-      formData.append('format', selectedFormat.value);
-      formData.append('author_name', downloadForm.querySelector('input[name="author_name"]').value);
-
-      selectedCards.forEach(card => {
-        formData.append('book_links', card.dataset.link);
-        formData.append('book_titles', card.dataset.title);
-      });
+      // Prepare data for the background job
+      const downloadData = {
+          format: selectedFormat.value,
+          author_name: downloadForm.querySelector('input[name="author_name"]').value,
+          book_links: Array.from(selectedCards).map(card => card.dataset.link),
+          book_titles: Array.from(selectedCards).map(card => card.dataset.title)
+      };
 
       progressContainer.classList.add('active');
       downloadBtn.disabled = true;
+      progressBar.style.width = '0%';
+      progressPercent.textContent = '0%';
+      progressText.textContent = 'Starting download job...';
 
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += Math.random() * 20;  // Increased from 15 for faster progress
-        if (progress > 90) progress = 90;
-        progressBar.style.width = progress + '%';
-        progressPercent.textContent = Math.round(progress) + '%';
-        progressText.textContent = progress < 30 ? 'Preparing download...' :
-                                   progress < 60 ? 'Fetching books...' :
-                                   'Creating archive...';
-      }, 150);  // Reduced from 200ms to 150ms for smoother animation
-
-      // Submit form
-      fetch('/download', {
-        method: 'POST',
-        body: formData
+      // 1. Call the endpoint to start the job
+      fetch('/start-download', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(downloadData)
       })
       .then(response => {
-        if (!response.ok) throw new Error('Download failed');
-
-        // Get filename from response header or construct it
-        const disposition = response.headers.get('content-disposition');
-        let filename = 'books.7z';
-
-        if (disposition && disposition.includes('filename=')) {
-          // Extract filename from Content-Disposition header
-          const matches = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-          if (matches && matches[1]) {
-            filename = matches[1].replace(/['"]/g, '');
-          }
-        } else if (selectedBooks === 1) {
-          // For single book, use the book title
-          const firstSelected = document.querySelector('.book-card.selected');
-          if (firstSelected) {
-            const title = firstSelected.dataset.title;
-            // Sanitize filename - remove invalid characters
-            const sanitized = title.replace(/[<>:"/\\|?*]/g, '_').trim();
-            filename = `${sanitized}.${selectedFormat.value}`;
-          }
-        }
-
-        return response.blob().then(blob => ({ blob, filename }));
+          if (!response.ok) throw new Error('Failed to start job');
+          return response.json();
       })
-      .then(({ blob, filename }) => {
-        clearInterval(interval);
-        progressBar.style.width = '100%';
-        progressPercent.textContent = '100%';
-        progressText.textContent = 'Download complete!';
+      .then(data => {
+          const { job_id } = data;
+          if (!job_id) throw new Error('Invalid job ID received');
 
-        // Trigger download
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a.remove();
+          showToast('Job Started', 'Your download is being prepared.', 'success');
+          
+          // 2. Poll the status endpoint every 3 seconds
+          const interval = setInterval(() => {
+              fetch(`/job-status/${job_id}`)
+              .then(res => res.json())
+              .then(statusData => {
+                  // Update progress bar
+                  progressBar.style.width = statusData.progress + '%';
+                  progressPercent.textContent = statusData.progress + '%';
+                  progressText.textContent = statusData.message || 'Processing...';
 
-        showToast('Success', `Downloaded ${selectedBooks} book(s)`, 'success');
+                  if (statusData.status === 'complete') {
+                      // 3. Job is done, stop polling and trigger download
+                      clearInterval(interval);
+                      progressText.textContent = 'Download ready!';
+                      showToast('Success', 'Your archive is ready!', 'success');
+                      
+                      // Trigger the final download
+                      window.location.href = `/fetch/${statusData.filename}`;
 
-        setTimeout(() => {
-          progressContainer.classList.remove('active');
-          downloadBtn.disabled = false;
-          progressBar.style.width = '0%';
-        }, 2000);
+                      setTimeout(() => {
+                          progressContainer.classList.remove('active');
+                          downloadBtn.disabled = false;
+                      }, 3000);
+                  } else if (statusData.status === 'error') {
+                      // Handle errors
+                      clearInterval(interval);
+                      progressContainer.classList.remove('active');
+                      downloadBtn.disabled = false;
+                      showToast('Error', statusData.message || 'An error occurred.', 'error');
+                  }
+              });
+          }, 3000);
       })
       .catch(error => {
-        clearInterval(interval);
-        progressContainer.classList.remove('active');
-        downloadBtn.disabled = false;
-        showToast('Error', 'Download failed. Please try again.', 'error');
-        console.error('Download error:', error);
+          progressContainer.classList.remove('active');
+          downloadBtn.disabled = false;
+          showToast('Error', 'Could not start download job.', 'error');
+          console.error('Error starting download:', error);
       });
     });
 
