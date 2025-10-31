@@ -139,6 +139,7 @@ def start_download_job():
     # Start the download process in a background thread, passing the lock
     thread = threading.Thread(
         target=download_books_to_disk,
+        # *** THIS IS THE CORRECTED LINE ***
         args=(job_id, books, file_format, author_name, JOBS, JOBS_LOCK)
     )
     thread.start()
