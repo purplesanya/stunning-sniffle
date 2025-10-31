@@ -1,8 +1,7 @@
 # flibusta_utils.py
-import io
 import time
 import requests
-import py7zr
+import zipfile  # <-- IMPORT ZIPFILE
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from requests.adapters import HTTPAdapter
@@ -155,7 +154,7 @@ def _fetch_book_to_file(title, link, destination_path):
 
 def download_books_to_disk(job_id, books, file_format, author_name, jobs_dict, lock):
     """
-    Downloads books to a temporary directory on disk, creates a 7z archive,
+    Downloads books to a temporary directory on disk, creates a zip archive,
     and updates a shared dictionary with progress using a lock.
     """
     if not books:
@@ -169,9 +168,10 @@ def download_books_to_disk(job_id, books, file_format, author_name, jobs_dict, l
     
     def update_status(progress, message):
         with lock:
-            jobs_dict[job_id] = {"status": "processing", "progress": progress, "message": message}
+            jobs_dict[job_id] = {"status": "processing", "progress": int(progress), "message": message}
 
     try:
+        # Step 1: Download all books (0% -> 80% of progress)
         with ThreadPoolExecutor(max_workers=3) as executor:
             future_to_book = {}
             for title, link in books:
@@ -183,26 +183,37 @@ def download_books_to_disk(job_id, books, file_format, author_name, jobs_dict, l
             
             for future in as_completed(future_to_book):
                 title = future_to_book[future]
-                if future.result():  # Check if download was successful
+                if future.result():
                     books_downloaded += 1
                 else:
                     logger.warning(f"Skipping book '{title}' due to download failure.")
                 
-                progress = int((books_downloaded / total_books) * 90)
+                progress = (books_downloaded / total_books) * 80
                 update_status(progress, f"Downloaded {books_downloaded}/{total_books}")
 
-        update_status(95, "Creating archive...")
+        # Step 2: Create the zip archive with granular progress (80% -> 100% of progress)
         if author_name:
             archive_name_base = f"{sanitize_filename(author_name)}_books"
         else:
             archive_name_base = "flibusta_books"
         
-        archive_name = f"{archive_name_base}_{job_id[:8]}.7z"
+        archive_name = f"{archive_name_base}_{job_id[:8]}.zip" # <-- CHANGED to .zip
         archive_path = os.path.join(tempfile.gettempdir(), archive_name)
+        
+        files_to_archive = os.listdir(download_dir)
+        total_files_to_archive = len(files_to_archive)
+        archived_count = 0
 
-        with py7zr.SevenZipFile(archive_path, 'w') as archive:
-            archive.writeall(download_dir, arcname='')
+        with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for filename in files_to_archive:
+                file_path = os.path.join(download_dir, filename)
+                zipf.write(file_path, arcname=filename)
+                archived_count += 1
+                # Archiving will take up the last 20% of the progress bar
+                progress = 80 + (archived_count / total_files_to_archive) * 20
+                update_status(progress, f"Archiving {archived_count}/{total_files_to_archive}")
 
+        # Step 3: Finalize
         with lock:
             jobs_dict[job_id] = {"status": "complete", "progress": 100, "filename": archive_name}
         logger.info(f"Archive created successfully: {archive_path}")
@@ -213,4 +224,5 @@ def download_books_to_disk(job_id, books, file_format, author_name, jobs_dict, l
             jobs_dict[job_id] = {"status": "error", "message": "An unexpected error occurred."}
     
     finally:
+        # Clean up the directory with downloaded books
         shutil.rmtree(download_dir)
