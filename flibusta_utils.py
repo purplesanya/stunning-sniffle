@@ -1,7 +1,8 @@
 # flibusta_utils.py
 import time
 import requests
-import zipfile  # <-- IMPORT ZIPFILE
+import zipfile
+import io  # <-- Import io for BytesIO
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from requests.adapters import HTTPAdapter
@@ -12,16 +13,14 @@ import tempfile
 import shutil
 
 logger = logging.getLogger(__name__)
-
 BASE_URL = "https://flibusta.is"
 
-# Rate limiting
+# ... (rate_limit and get_session are unchanged) ...
 last_request_time = 0
 MIN_REQUEST_INTERVAL = 0.2
 
 
 def rate_limit():
-    """Simple rate limiting"""
     global last_request_time
     current_time = time.time()
     time_since_last = current_time - last_request_time
@@ -31,12 +30,9 @@ def rate_limit():
 
 
 def get_session():
-    """Create a requests session with retry logic"""
     session = requests.Session()
     retry = Retry(
-        total=3,
-        backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
+        total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504],
         allowed_methods=["GET", "POST"]
     )
     adapter = HTTPAdapter(max_retries=retry)
@@ -49,7 +45,7 @@ def get_session():
 
 
 def search_authors(author_name, max_retries=3):
-    """Search for authors on Flibusta with retry logic."""
+    # This function is correct and remains unchanged
     session = get_session()
     for attempt in range(max_retries):
         try:
@@ -84,8 +80,124 @@ def search_authors(author_name, max_retries=3):
     return []
 
 
+# *** NEW FUNCTION TO DOWNLOAD A SINGLE BOOK ***
+def download_single_book(book_id, file_format, title):
+    """Downloads a single book and returns it as a BytesIO object for sending."""
+    session = get_session()
+    url = f"{BASE_URL}/b/{book_id}/{file_format}"
+    logger.info(f"Proxy downloading book: {title} from {url}")
+
+    try:
+        rate_limit()
+        response = session.get(url, timeout=60)
+        response.raise_for_status()  # Will raise an error for 403, 404, etc.
+
+        # Prepare for sending the file
+        sanitized_title = sanitize_filename(title)
+        filename = f"{sanitized_title}.{file_format}"
+
+        mime_types = {
+            "epub": "application/epub+zip",
+            "fb2": "application/x-fictionbook+xml",
+            "mobi": "application/x-mobipocket-ebook"
+        }
+        mimetype = mime_types.get(file_format, "application/octet-stream")
+
+        # Return the raw content in a memory buffer
+        return filename, io.BytesIO(response.content), mimetype
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to proxy download book {book_id}: {e}")
+        raise
+
+
+def _get_download_links_from_book_page(book_page_url):
+    # This function is now correct and remains unchanged
+    logger.debug(f"      Fetching details from book page: {book_page_url}")
+    session = get_session()
+    try:
+        rate_limit()
+        response = session.get(book_page_url, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, "html.parser")
+        download_links = {}
+        book_id_part = book_page_url.split('/b/')[1].split('?')[0]  # Get ID from URL
+        for link in soup.find_all("a", href=lambda href: href and f"/b/{book_id_part}" in href):
+            link_text = link.text.strip().lower()
+            if link_text == '(fb2)':
+                download_links['fb2'] = f"{BASE_URL}{link['href']}"
+            elif link_text == '(epub)':
+                download_links['epub'] = f"{BASE_URL}{link['href']}"
+            elif link_text == '(mobi)':
+                download_links['mobi'] = f"{BASE_URL}{link['href']}"
+        logger.debug(f"      Found links on page: {download_links}")
+        return download_links
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"      Failed to fetch book page {book_page_url}: {e}")
+        return {}
+
+
+def search_books(book_title, max_retries=3):
+    # *** MODIFIED to include book_id in the result ***
+    logger.debug("--- STARTING 2-STEP BOOK SEARCH DEBUG ---")
+    session = get_session()
+    search_url = f"{BASE_URL}/booksearch?ask={book_title}"
+    logger.debug(f"Step 1: Fetching search results from {search_url}")
+    try:
+        rate_limit()
+        response = session.get(search_url, timeout=15)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, "html.parser")
+        book_section_header = soup.find("h3", string=lambda text: text and "Найденные книги" in text)
+        if not book_section_header:
+            return []
+        results_list = book_section_header.find_next_sibling("ul")
+        if not results_list:
+            return []
+        potential_books = []
+        for item in results_list.find_all("li", recursive=False):
+            main_book_link = item.find("a", href=lambda href: href and href.startswith('/b/'))
+            if not main_book_link:
+                continue
+            author_link = item.find("a", href=lambda href: href and href.startswith('/a/'))
+            book_id = main_book_link['href'].split('/')[2]  # Extract book ID
+            potential_books.append({
+                "title": main_book_link.text.strip(),
+                "book_page_url": f"{BASE_URL}{main_book_link['href']}",
+                "author_name": author_link.text.strip() if author_link else "Unknown Author",
+                "author_id": author_link['href'].split('/')[-1] if author_link else None,
+                "book_id": book_id  # Add the book_id here
+            })
+        if not potential_books:
+            return []
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch initial search page: {e}", exc_info=True)
+        return []
+
+    logger.debug("Step 2: Fetching download links from each book's page...")
+    final_books = []
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        future_to_book = {
+            executor.submit(_get_download_links_from_book_page, book["book_page_url"]): book
+            for book in potential_books
+        }
+        for future in as_completed(future_to_book):
+            book_data = future_to_book[future]
+            try:
+                download_links = future.result()
+                if download_links:
+                    book_data["links"] = download_links
+                    del book_data["book_page_url"]
+                    final_books.append(book_data)
+            except Exception as e:
+                logger.error(f"An error occurred while processing details for '{book_data['title']}': {e}",
+                             exc_info=True)
+    logger.info(f"Final result: Found {len(final_books)} books with download links.")
+    return final_books
+
+
+# ... (The rest of the file: find_books, sanitize_filename, etc. is unchanged) ...
 def find_books(author_id, file_format, max_retries=3):
-    """Find all books by an author in a specific format with retry logic."""
     session = get_session()
     for attempt in range(max_retries):
         try:
@@ -122,7 +234,6 @@ def find_books(author_id, file_format, max_retries=3):
 
 
 def sanitize_filename(filename):
-    """Sanitize filename to remove invalid characters"""
     invalid_chars = '<>:"/\\|?*'
     for char in invalid_chars:
         filename = filename.replace(char, '_')
@@ -133,10 +244,6 @@ def sanitize_filename(filename):
 
 
 def _fetch_book_to_file(title, link, destination_path):
-    """
-    Downloads a single book and streams it directly to a file on disk.
-    This uses minimal memory.
-    """
     session = get_session()
     logger.info(f"Downloading '{title}' to '{destination_path}'")
     try:
@@ -153,25 +260,19 @@ def _fetch_book_to_file(title, link, destination_path):
 
 
 def download_books_to_disk(job_id, books, file_format, author_name, jobs_dict, lock):
-    """
-    Downloads books to a temporary directory on disk, creates a zip archive,
-    and updates a shared dictionary with progress using a lock.
-    """
     if not books:
         with lock:
             jobs_dict[job_id] = {"status": "error", "message": "No books selected"}
         return
-
     download_dir = tempfile.mkdtemp()
     total_books = len(books)
     books_downloaded = 0
-    
+
     def update_status(progress, message):
         with lock:
             jobs_dict[job_id] = {"status": "processing", "progress": int(progress), "message": message}
 
     try:
-        # Step 1: Download all books (0% -> 80% of progress)
         with ThreadPoolExecutor(max_workers=3) as executor:
             future_to_book = {}
             for title, link in books:
@@ -180,49 +281,36 @@ def download_books_to_disk(job_id, books, file_format, author_name, jobs_dict, l
                 destination_path = os.path.join(download_dir, book_filename)
                 future = executor.submit(_fetch_book_to_file, title, link, destination_path)
                 future_to_book[future] = title
-            
             for future in as_completed(future_to_book):
                 title = future_to_book[future]
                 if future.result():
                     books_downloaded += 1
                 else:
                     logger.warning(f"Skipping book '{title}' due to download failure.")
-                
                 progress = (books_downloaded / total_books) * 80
                 update_status(progress, f"Downloaded {books_downloaded}/{total_books}")
-
-        # Step 2: Create the zip archive with granular progress (80% -> 100% of progress)
         if author_name:
             archive_name_base = f"{sanitize_filename(author_name)}_books"
         else:
             archive_name_base = "flibusta_books"
-        
-        archive_name = f"{archive_name_base}_{job_id[:8]}.zip" # <-- CHANGED to .zip
+        archive_name = f"{archive_name_base}_{job_id[:8]}.zip"
         archive_path = os.path.join(tempfile.gettempdir(), archive_name)
-        
         files_to_archive = os.listdir(download_dir)
         total_files_to_archive = len(files_to_archive)
         archived_count = 0
-
         with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for filename in files_to_archive:
                 file_path = os.path.join(download_dir, filename)
                 zipf.write(file_path, arcname=filename)
                 archived_count += 1
-                # Archiving will take up the last 20% of the progress bar
                 progress = 80 + (archived_count / total_files_to_archive) * 20
                 update_status(progress, f"Archiving {archived_count}/{total_files_to_archive}")
-
-        # Step 3: Finalize
         with lock:
             jobs_dict[job_id] = {"status": "complete", "progress": 100, "filename": archive_name}
         logger.info(f"Archive created successfully: {archive_path}")
-
     except Exception as e:
         logger.error(f"Error during job {job_id}: {e}", exc_info=True)
         with lock:
             jobs_dict[job_id] = {"status": "error", "message": "An unexpected error occurred."}
-    
     finally:
-        # Clean up the directory with downloaded books
         shutil.rmtree(download_dir)
