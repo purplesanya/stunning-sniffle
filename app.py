@@ -2,7 +2,7 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory, send_file
 from flibusta_utils import (
     search_authors, find_books, download_books_to_disk, search_books,
-    download_single_book # <-- Import the new function
+    download_single_book
 )
 from datetime import datetime, timedelta
 import logging
@@ -24,6 +24,7 @@ CACHE_DURATION = timedelta(hours=1)
 JOBS = {}
 JOBS_LOCK = threading.Lock()
 
+
 def get_cached(key):
     if key in cache:
         value, timestamp = cache[key]
@@ -32,10 +33,13 @@ def get_cached(key):
         else:
             del cache[key]
     return None
+
+
 def set_cached(key, value):
     cache[key] = (value, datetime.now())
 
-# ... (The / route is unchanged) ...
+
+# ... (/ route is unchanged) ...
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
@@ -62,37 +66,37 @@ def index():
             return render_template("index.html", error="An error occurred during the search. Please try again.")
     return render_template("index.html")
 
-# *** NEW ROUTE TO PROXY SINGLE BOOK DOWNLOADS ***
+
+# ... (/download-book proxy is unchanged) ...
 @app.route("/download-book/<book_id>/<file_format>")
 def download_book_proxy(book_id, file_format):
-    title = request.args.get('title', 'book') # Get title from query param
-    if file_format not in ['epub', 'fb2', 'mobi']:
+    title = request.args.get('title', 'book')
+    if file_format not in ['epub', 'fb2', 'mobi', 'pdf', 'docx']:
         return "Invalid format", 400
     try:
         filename, buffer, mimetype = download_single_book(book_id, file_format, title)
-        return send_file(
-            buffer,
-            as_attachment=True,
-            download_name=filename,
-            mimetype=mimetype
-        )
+        return send_file(buffer, as_attachment=True, download_name=filename, mimetype=mimetype)
     except Exception as e:
         logger.error(f"Failed to serve single book download for {book_id}: {e}")
         return "Download failed.", 500
 
-# ... (The rest of the routes: /books, /api/books, /start-download, etc., are unchanged) ...
+
+# *** MODIFIED /books ROUTE - No longer cares about format ***
 @app.route("/books/<author_id>")
 def books(author_id):
-    file_format = request.args.get("format", "epub").lower()
-    if file_format not in ["epub", "fb2", "mobi"]:
-        file_format = "epub"
     try:
-        cache_key = f"books:{author_id}:{file_format}"
+        # We no longer filter by format here; we get all of them.
+        cache_key = f"all_books_for_author:{author_id}"
         books_list = get_cached(cache_key)
+
         if books_list is None:
-            books_list = find_books(author_id, file_format)
+            logger.info(f"Fetching all books for author {author_id}")
+            books_list = find_books(author_id)  # Call the rewritten function
             set_cached(cache_key, books_list)
-        author_name = None
+        else:
+            logger.info(f"Using cached books for author {author_id}")
+
+        author_name = None  # Logic to find author name is unchanged
         for key in cache.keys():
             if key.startswith("author_search:"):
                 authors_list_cached, _ = cache[key]
@@ -102,28 +106,18 @@ def books(author_id):
                         break
                 if author_name:
                     break
-        return render_template("books.html", books=books_list, author_id=author_id,
-                               file_format=file_format, author_name=author_name)
-    except Exception as e:
-        logger.error(f"Error fetching books for author {author_id}: {str(e)}")
-        return render_template("books.html", books=[], author_id=author_id,
-                               file_format=file_format, error="Error loading books")
-@app.route("/api/books/<author_id>")
-def api_books(author_id):
-    file_format = request.args.get("format", "epub").lower()
-    if file_format not in ["epub", "fb2", "mobi"]:
-        return jsonify({"error": "Invalid format", "books": []}), 400
-    try:
-        cache_key = f"books:{author_id}:{file_format}"
-        books_list = get_cached(cache_key)
-        if books_list is None:
-            books_list = find_books(author_id, file_format)
-            set_cached(cache_key, books_list)
-        return jsonify({"books": books_list, "count": len(books_list)})
-    except Exception as e:
-        logger.error(f"API error fetching books for author {author_id}: {str(e)}")
-        return jsonify({"error": "Failed to fetch books", "books": []}), 500
 
+        # Pass the new, rich book data structure to the template
+        return render_template("books.html", books=books_list, author_id=author_id, author_name=author_name)
+
+    except Exception as e:
+        logger.error(f"Error fetching books page for author {author_id}: {str(e)}")
+        return render_template("books.html", books=[], author_id=author_id, error="Error loading books")
+
+
+# *** REMOVED the now-obsolete /api/books endpoint ***
+
+# ... (The rest of the routes: /start-download, etc., are unchanged) ...
 @app.route("/start-download", methods=["POST"])
 def start_download_job():
     data = request.json
@@ -144,6 +138,7 @@ def start_download_job():
     thread.start()
     return jsonify({"job_id": job_id})
 
+
 @app.route("/job-status/<job_id>")
 def get_job_status(job_id):
     with JOBS_LOCK:
@@ -152,20 +147,24 @@ def get_job_status(job_id):
         return jsonify({"status": "error", "message": "Job not found"}), 404
     return jsonify(job)
 
+
 @app.route("/fetch/<filename>")
 def fetch_file(filename):
     if ".." in filename or filename.startswith("/"):
         return "Invalid filename", 400
     return send_from_directory(tempfile.gettempdir(), filename, as_attachment=True)
 
+
 @app.errorhandler(404)
 def not_found(e):
     return render_template("index.html", error="Page not found"), 404
+
 
 @app.errorhandler(500)
 def server_error(e):
     logger.error(f"Server error: {str(e)}")
     return render_template("index.html", error="An internal error occurred"), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000, host="0.0.0.0")

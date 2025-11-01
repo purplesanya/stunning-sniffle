@@ -2,7 +2,7 @@
 import time
 import requests
 import zipfile
-import io  # <-- Import io for BytesIO
+import io
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from requests.adapters import HTTPAdapter
@@ -15,7 +15,7 @@ import shutil
 logger = logging.getLogger(__name__)
 BASE_URL = "https://flibusta.is"
 
-# ... (rate_limit and get_session are unchanged) ...
+# ... (rate_limit, get_session, search_authors, download_single_book are unchanged) ...
 last_request_time = 0
 MIN_REQUEST_INTERVAL = 0.2
 
@@ -45,7 +45,6 @@ def get_session():
 
 
 def search_authors(author_name, max_retries=3):
-    # This function is correct and remains unchanged
     session = get_session()
     for attempt in range(max_retries):
         try:
@@ -80,39 +79,31 @@ def search_authors(author_name, max_retries=3):
     return []
 
 
-# *** NEW FUNCTION TO DOWNLOAD A SINGLE BOOK ***
 def download_single_book(book_id, file_format, title):
-    """Downloads a single book and returns it as a BytesIO object for sending."""
     session = get_session()
     url = f"{BASE_URL}/b/{book_id}/{file_format}"
+    if file_format in ['pdf', 'docx']:
+        url = f"{BASE_URL}/b/{book_id}/download"
     logger.info(f"Proxy downloading book: {title} from {url}")
-
     try:
         rate_limit()
         response = session.get(url, timeout=60)
-        response.raise_for_status()  # Will raise an error for 403, 404, etc.
-
-        # Prepare for sending the file
+        response.raise_for_status()
         sanitized_title = sanitize_filename(title)
         filename = f"{sanitized_title}.{file_format}"
-
         mime_types = {
-            "epub": "application/epub+zip",
-            "fb2": "application/x-fictionbook+xml",
-            "mobi": "application/x-mobipocket-ebook"
+            "epub": "application/epub+zip", "fb2": "application/x-fictionbook+xml",
+            "mobi": "application/x-mobipocket-ebook", "pdf": "application/pdf",
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         }
         mimetype = mime_types.get(file_format, "application/octet-stream")
-
-        # Return the raw content in a memory buffer
         return filename, io.BytesIO(response.content), mimetype
-
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to proxy download book {book_id}: {e}")
         raise
 
 
 def _get_download_links_from_book_page(book_page_url):
-    # This function is now correct and remains unchanged
     logger.debug(f"      Fetching details from book page: {book_page_url}")
     session = get_session()
     try:
@@ -121,16 +112,20 @@ def _get_download_links_from_book_page(book_page_url):
         response.raise_for_status()
         soup = BeautifulSoup(response.content, "html.parser")
         download_links = {}
-        book_id_part = book_page_url.split('/b/')[1].split('?')[0]  # Get ID from URL
-        for link in soup.find_all("a", href=lambda href: href and f"/b/{book_id_part}" in href):
+        book_id = book_page_url.split('/b/')[1].split('?')[0]
+        for link in soup.find_all("a", href=lambda href: href and f"/b/{book_id}" in href):
             link_text = link.text.strip().lower()
-            if link_text == '(fb2)':
+            if 'fb2' in link_text:
                 download_links['fb2'] = f"{BASE_URL}{link['href']}"
-            elif link_text == '(epub)':
+            elif 'epub' in link_text:
                 download_links['epub'] = f"{BASE_URL}{link['href']}"
-            elif link_text == '(mobi)':
+            elif 'mobi' in link_text:
                 download_links['mobi'] = f"{BASE_URL}{link['href']}"
-        logger.debug(f"      Found links on page: {download_links}")
+            elif 'pdf' in link_text:
+                download_links['pdf'] = f"{BASE_URL}{link['href']}"
+            elif 'docx' in link_text:
+                download_links['docx'] = f"{BASE_URL}{link['href']}"
+        logger.debug(f"      Found formats on page: {list(download_links.keys())}")
         return download_links
     except requests.exceptions.RequestException as e:
         logger.warning(f"      Failed to fetch book page {book_page_url}: {e}")
@@ -138,7 +133,7 @@ def _get_download_links_from_book_page(book_page_url):
 
 
 def search_books(book_title, max_retries=3):
-    # *** MODIFIED to include book_id in the result ***
+    # This function is correct and remains unchanged
     logger.debug("--- STARTING 2-STEP BOOK SEARCH DEBUG ---")
     session = get_session()
     search_url = f"{BASE_URL}/booksearch?ask={book_title}"
@@ -149,38 +144,30 @@ def search_books(book_title, max_retries=3):
         response.raise_for_status()
         soup = BeautifulSoup(response.content, "html.parser")
         book_section_header = soup.find("h3", string=lambda text: text and "Найденные книги" in text)
-        if not book_section_header:
-            return []
+        if not book_section_header: return []
         results_list = book_section_header.find_next_sibling("ul")
-        if not results_list:
-            return []
+        if not results_list: return []
         potential_books = []
         for item in results_list.find_all("li", recursive=False):
             main_book_link = item.find("a", href=lambda href: href and href.startswith('/b/'))
-            if not main_book_link:
-                continue
+            if not main_book_link: continue
             author_link = item.find("a", href=lambda href: href and href.startswith('/a/'))
-            book_id = main_book_link['href'].split('/')[2]  # Extract book ID
+            book_id = main_book_link['href'].split('/')[2]
             potential_books.append({
                 "title": main_book_link.text.strip(),
                 "book_page_url": f"{BASE_URL}{main_book_link['href']}",
                 "author_name": author_link.text.strip() if author_link else "Unknown Author",
-                "author_id": author_link['href'].split('/')[-1] if author_link else None,
-                "book_id": book_id  # Add the book_id here
+                "author_id": author_link['href'].split('/')[-1] if author_link else None, "book_id": book_id
             })
-        if not potential_books:
-            return []
+        if not potential_books: return []
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to fetch initial search page: {e}", exc_info=True)
         return []
-
     logger.debug("Step 2: Fetching download links from each book's page...")
     final_books = []
     with ThreadPoolExecutor(max_workers=3) as executor:
-        future_to_book = {
-            executor.submit(_get_download_links_from_book_page, book["book_page_url"]): book
-            for book in potential_books
-        }
+        future_to_book = {executor.submit(_get_download_links_from_book_page, book["book_page_url"]): book for book in
+                          potential_books}
         for future in as_completed(future_to_book):
             book_data = future_to_book[future]
             try:
@@ -196,34 +183,64 @@ def search_books(book_title, max_retries=3):
     return final_books
 
 
-# ... (The rest of the file: find_books, sanitize_filename, etc. is unchanged) ...
-def find_books(author_id, file_format, max_retries=3):
+# *** REWRITTEN find_books FUNCTION ***
+def find_books(author_id, max_retries=3):
+    """
+    Finds all books by an author and ALL available download formats for each book.
+    """
     session = get_session()
     for attempt in range(max_retries):
         try:
             rate_limit()
             url = f"{BASE_URL}/a/{author_id}"
-            logger.info(f"Fetching books: {url} (attempt {attempt + 1})")
+            logger.info(f"Fetching all books and formats for author {author_id}")
             response = session.get(url, timeout=20)
             response.raise_for_status()
+
             soup = BeautifulSoup(response.content, "html.parser")
             books = []
-            seen_books = set()
-            for fmt_tag in soup.find_all("a", string=f"({file_format})"):
-                href = fmt_tag.get("href", "")
-                parts = href.split("/")
-                if len(parts) > 2 and parts[1] == "b":
-                    book_path = f"/{parts[1]}/{parts[2]}"
-                    if book_path in seen_books:
-                        continue
-                    seen_books.add(book_path)
-                    title_tag = soup.find("a", href=book_path)
-                    if title_tag:
-                        title = title_tag.text.strip()
-                        download_url = f"{BASE_URL}{href}"
-                        books.append((title, download_url))
-            logger.info(f"Found {len(books)} book(s) in {file_format} format")
+
+            # Find all main book links on the author page
+            main_book_links = soup.select("a[href^='/b/']")
+            seen_book_ids = set()
+
+            for link in main_book_links:
+                book_id = link['href'].split('/')[2]
+                if book_id in seen_book_ids:
+                    continue
+                seen_book_ids.add(book_id)
+
+                title = link.text.strip()
+
+                # Find the container of this link to find sibling format links
+                # This is a bit fragile, as it assumes structure. A common parent is often 'div' or 'li'.
+                parent = link.find_parent(['div', 'li'])
+                if not parent:
+                    parent = soup  # Fallback to the whole page if no close parent found
+
+                download_links = {}
+                for format_link in parent.find_all("a", href=lambda href: href and f"/b/{book_id}" in href):
+                    link_text = format_link.text.strip().lower()
+                    if 'fb2' in link_text:
+                        download_links['fb2'] = f"{BASE_URL}{format_link['href']}"
+                    elif 'epub' in link_text:
+                        download_links['epub'] = f"{BASE_URL}{format_link['href']}"
+                    elif 'mobi' in link_text:
+                        download_links['mobi'] = f"{BASE_URL}{format_link['href']}"
+                    elif 'pdf' in link_text:
+                        download_links['pdf'] = f"{BASE_URL}{format_link['href']}"
+                    elif 'docx' in link_text:
+                        download_links['docx'] = f"{BASE_URL}{format_link['href']}"
+
+                if title and download_links:
+                    books.append({
+                        "title": title,
+                        "links": download_links
+                    })
+
+            logger.info(f"Found {len(books)} unique books for author {author_id}")
             return books
+
         except requests.exceptions.RequestException as e:
             logger.warning(f"Attempt {attempt + 1} failed: {str(e)}")
             if attempt == max_retries - 1:
@@ -233,6 +250,7 @@ def find_books(author_id, file_format, max_retries=3):
     return []
 
 
+# ... (sanitize_filename, _fetch_book_to_file, download_books_to_disk are unchanged) ...
 def sanitize_filename(filename):
     invalid_chars = '<>:"/\\|?*'
     for char in invalid_chars:
