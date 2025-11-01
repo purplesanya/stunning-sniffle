@@ -65,7 +65,7 @@
           {% endif %}
 
           <div class="download-links">
-            <!-- *** MODIFIED: Links now point to our own server's proxy route *** -->
+            <!-- *** MODIFIED: Added conditional buttons for PDF and DOCX *** -->
             {% if 'epub' in book.links %}
               <a href="{{ url_for('download_book_proxy', book_id=book.book_id, file_format='epub', title=book.title) }}" class="download-btn">EPUB</a>
             {% endif %}
@@ -74,6 +74,12 @@
             {% endif %}
             {% if 'mobi' in book.links %}
               <a href="{{ url_for('download_book_proxy', book_id=book.book_id, file_format='mobi', title=book.title) }}" class="download-btn">MOBI</a>
+            {% endif %}
+            {% if 'pdf' in book.links %}
+              <a href="{{ url_for('download_book_proxy', book_id=book.book_id, file_format='pdf', title=book.title) }}" class="download-btn">PDF</a>
+            {% endif %}
+            {% if 'docx' in book.links %}
+              <a href="{{ url_for('download_book_proxy', book_id=book.book_id, file_format='docx', title=book.title) }}" class="download-btn">DOCX</a>
             {% endif %}
           </div>
         </div>
