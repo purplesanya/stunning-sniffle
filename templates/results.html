@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t("results_title") }}{% endblock %}
+{% block page_id %}results{% endblock %}
+
+{% block content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">{{ t("results_eyebrow") }}</p>
+      <h1>{{ t("results_for") }} "{{ search_query }}"</h1>
+      {% if searched_variants %}
+        <p class="lead compact">{{ t("also_searched") }}: {{ searched_variants|join(", ") }}</p>
+      {% endif %}
+    </div>
+    <a href="{{ url_for('index', lang=lang) }}" class="button button-secondary">{{ t("new_search") }}</a>
+  </section>
+
+  {% if authors or books %}
+    <div
+      class="results-grid bookmark-root book-detail-root"
+      data-bookmark="{{ t('bookmark') }}"
+      data-bookmarked="{{ t('bookmarked') }}"
+      data-remove-bookmark="{{ t('remove_bookmark') }}"
+      data-unknown-author="{{ t('unknown_author') }}"
+      data-loading-description="{{ t('loading_description') }}"
+      data-no-book-description="{{ t('no_book_description') }}"
+      data-details-failed="{{ t('details_failed') }}"
+      data-download-formats="{{ t('download_formats') }}"
+      data-show-more="{{ t('show_more') }}"
+      data-show-less="{{ t('show_less') }}"
+      data-details="{{ t('details') }}"
+      data-close="{{ t('close') }}"
+      data-book-description="{{ t('book_description') }}"
+    >
+      <section class="result-section" aria-labelledby="authors-title">
+        <div class="section-heading">
+          <h2 id="authors-title">{{ t("authors") }}</h2>
+          <span class="count-pill">{{ authors|length }}</span>
+        </div>
+        {% if authors %}
+          <div class="list-stack">
+            {% for name, id in authors %}
+              <a href="{{ url_for('books', author_id=id, lang=lang) }}" class="result-row">
+                <span class="result-title">{{ name }}</span>
+                <span class="result-action">{{ t("view_books") }}</span>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-inline">{{ t("no_author_matches") }}</p>
+        {% endif %}
+      </section>
+
+      <section class="result-section" aria-labelledby="books-title">
+        <div class="section-heading">
+          <h2 id="books-title">{{ t("books") }}</h2>
+          <span class="count-pill">{{ books|length }}</span>
+        </div>
+        {% if books %}
+          <div class="book-result-list">
+            {% for book in books %}
+              <article class="book-result" data-detail-card data-title="{{ book.title }}">
+                <div class="book-copy">
+                  <h3>{{ book.title }}</h3>
+                  {% if book.author_id %}
+                    <a href="{{ url_for('books', author_id=book.author_id, lang=lang) }}" class="muted-link">{{ book.author_name }}</a>
+                  {% else %}
+                    <span class="muted-text">{{ book.author_name }}</span>
+                  {% endif %}
+                  <p class="book-description" data-book-id="{{ book.book_id }}">
+                    {{ book.description or t("loading_description") }}
+                  </p>
+                </div>
+                <div class="format-links" aria-label="Download formats">
+                  <button
+                    type="button"
+                    class="bookmark-button compact"
+                    data-bookmark-toggle
+                    data-book-id="{{ book.book_id }}"
+                    data-title="{{ book.title }}"
+                    data-author="{{ book.author_name or '' }}"
+                    data-author-id="{{ book.author_id or '' }}"
+                    data-url="https://flibusta.is/b/{{ book.book_id }}"
+                  >
+                    {{ t("bookmark") }}
+                  </button>
+                  {% for format in ("epub", "fb2", "mobi", "pdf", "docx") %}
+                    {% if format in book.links %}
+                      <a href="{{ url_for('download_book_proxy', book_id=book.book_id, file_format=format, title=book.title) }}" class="format-link">{{ format|upper }}</a>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-inline">{{ t("no_book_matches") }}</p>
+        {% endif %}
+      </section>
+    </div>
+  {% else %}
+    <section class="empty-state">
+      <h2>{{ t("no_results") }}</h2>
+      <p>{{ t("no_results_hint") }}</p>
+      <a href="{{ url_for('index', lang=lang) }}" class="button button-primary">{{ t("search_again") }}</a>
+    </section>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/bookmarks.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/book-details.js') }}"></script>
+{% endblock %}

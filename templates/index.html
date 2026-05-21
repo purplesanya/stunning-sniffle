@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t("search_title") }}{% endblock %}
+{% block page_id %}search{% endblock %}
+
+{% block content %}
+  <section class="search-hero" aria-labelledby="search-title">
+    <div class="hero-copy">
+      <p class="eyebrow">{{ t("search_eyebrow") }}</p>
+      <h1 id="search-title">{{ t("search_heading") }}</h1>
+      <p class="lead">
+        {{ t("search_lead") }}
+      </p>
+    </div>
+
+    <form method="POST" class="search-panel" id="searchForm">
+      <input type="hidden" name="lang" value="{{ lang }}">
+      <label class="input-label" for="searchInput">{{ t("search_label") }}</label>
+      <div class="search-field">
+        <input
+          name="query"
+          id="searchInput"
+          placeholder="{{ t('search_placeholder') }}"
+          required
+          autocomplete="off"
+        >
+        <button type="submit" class="button button-primary">{{ t("search_button") }}</button>
+      </div>
+      <p class="hint">{{ t("search_hint") }} <kbd>/</kbd> {{ t("search_hint_tail") }}</p>
+    </form>
+
+    {% if error %}
+      <div class="notice notice-error" role="alert">{{ error }}</div>
+    {% endif %}
+  </section>
+
+  <div class="loading-overlay" id="loadingOverlay" aria-hidden="true">
+    <div class="loading-box">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>{{ t("searching") }}</p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/search.js') }}"></script>
+{% endblock %}

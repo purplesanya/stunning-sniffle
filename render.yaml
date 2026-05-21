@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: floader
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120
+    healthCheckPath: /healthz
+    envVars:
+      - key: LOG_LEVEL
+        value: INFO

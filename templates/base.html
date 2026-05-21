@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ t("app_name") }}{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='floader.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body data-page="{% block page_id %}{% endblock %}">
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="{{ url_for('index', lang=lang) }}" aria-label="{{ t('go_search') }}">
+        <span class="brand-mark" aria-hidden="true">f.is</span>
+        <span class="brand-text">{{ t("app_name") }}</span>
+      </a>
+      <div class="topbar-actions">
+        <nav class="primary-nav" aria-label="Primary">
+          <a href="{{ url_for('index', lang=lang) }}" class="{% if request.endpoint == 'index' %}active{% endif %}">{{ t("nav_search") }}</a>
+          <a href="{{ url_for('recommendations', lang=lang) }}" class="{% if request.endpoint == 'recommendations' %}active{% endif %}">{{ t("nav_recommendations") }}</a>
+          <a href="{{ url_for('bookmarks', lang=lang) }}" class="{% if request.endpoint == 'bookmarks' %}active{% endif %}">{{ t("nav_bookmarks") }}</a>
+        </nav>
+        <nav class="language-switch" aria-label="Language">
+          <a href="{{ lang_url(lang='en') }}" class="{% if lang == 'en' %}active{% endif %}">EN</a>
+          <a href="{{ lang_url(lang='ru') }}" class="{% if lang == 'ru' %}active{% endif %}">RU</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <div class="toast-stack" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

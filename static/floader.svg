@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#f7f1df"/>
+  <path d="M15 14h25c6 0 10 4 10 10v26H24c-5 0-9-4-9-9V14z" fill="#ffffff" stroke="#2c5f9e" stroke-width="4"/>
+  <path d="M25 24h17M25 33h13M25 42h18" stroke="#2c5f9e" stroke-width="4" stroke-linecap="round"/>
+  <text x="32" y="58" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="700" fill="#2c5f9e">f.is</text>
+</svg>

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t("bookmarks_title") }}{% endblock %}
+{% block page_id %}bookmarks{% endblock %}
+
+{% block content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">{{ t("bookmarks_eyebrow") }}</p>
+      <h1>{{ t("bookmarks_heading") }}</h1>
+      <p class="lead compact">{{ t("bookmarks_lead") }}</p>
+    </div>
+  </section>
+
+  <section
+    class="result-section bookmark-root book-detail-root"
+    data-bookmark="{{ t('bookmark') }}"
+    data-bookmarked="{{ t('bookmarked') }}"
+    data-remove-bookmark="{{ t('remove_bookmark') }}"
+    data-no-bookmarks="{{ t('no_bookmarks') }}"
+    data-no-bookmarks-hint="{{ t('no_bookmarks_hint') }}"
+    data-open-book="{{ t('open_book') }}"
+    data-unknown-author="{{ t('unknown_author') }}"
+    data-loading-description="{{ t('loading_description') }}"
+    data-no-book-description="{{ t('no_book_description') }}"
+    data-details-failed="{{ t('details_failed') }}"
+    data-download-formats="{{ t('download_formats') }}"
+    data-show-more="{{ t('show_more') }}"
+    data-show-less="{{ t('show_less') }}"
+    data-details="{{ t('details') }}"
+    data-close="{{ t('close') }}"
+    data-book-description="{{ t('book_description') }}"
+  >
+    <div class="section-heading">
+      <h2>{{ t("nav_bookmarks") }}</h2>
+      <span class="count-pill" id="bookmarkCount">0</span>
+    </div>
+    <div class="book-result-list" id="bookmarkList"></div>
+    <section class="empty-state small" id="bookmarkEmpty">
+      <h2>{{ t("no_bookmarks") }}</h2>
+      <p>{{ t("no_bookmarks_hint") }}</p>
+    </section>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/bookmarks.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/book-details.js') }}"></script>
+{% endblock %}
