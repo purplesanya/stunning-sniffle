@@ -24,7 +24,7 @@ Optional environment variables:
 - `FLASK_DEBUG=1`: enable Flask debug mode during development.
 - `LOG_LEVEL`: set Python logging level, for example `DEBUG` or `INFO`.
 
-To test from another device or LAN address, run with `FLASK_RUN_HOST=0.0.0.0` and open the machine IP, for example `http://HOST_IP:5000`.
+To test from another device or LAN address, run with `FLASK_RUN_HOST=0.0.0.0` and open the host machine's local address. Do not document a private network address in the repository.
 
 ## Deploy on Render
 
